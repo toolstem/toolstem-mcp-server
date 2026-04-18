@@ -1,0 +1,9 @@
+{
+  "actorSpecification": 1,
+  "name": "toolstem-financial-data",
+  "title": "Toolstem Financial Data",
+  "description": "Agent-ready financial intelligence tools. Get curated stock snapshots and deep company metrics synthesized from multiple data sources. Designed for AI agents — not raw API passthrough.",
+  "version": "1.0.0",
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile"
+}

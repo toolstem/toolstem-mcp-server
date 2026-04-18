@@ -1,0 +1,32 @@
+{
+  "title": "Toolstem Financial Data",
+  "description": "Curated financial intelligence for AI agents",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "tool": {
+      "title": "Tool",
+      "type": "string",
+      "description": "Which tool to run",
+      "enum": ["get_stock_snapshot", "get_company_metrics"],
+      "default": "get_stock_snapshot",
+      "editor": "select"
+    },
+    "symbol": {
+      "title": "Stock Symbol",
+      "type": "string",
+      "description": "Stock ticker symbol (e.g., AAPL, MSFT, TSLA)",
+      "editor": "textfield",
+      "prefill": "AAPL"
+    },
+    "period": {
+      "title": "Period",
+      "type": "string",
+      "description": "Reporting period (for company metrics only)",
+      "enum": ["annual", "quarter"],
+      "default": "annual",
+      "editor": "select"
+    }
+  },
+  "required": ["tool", "symbol"]
+}
