@@ -1,0 +1,14 @@
+# Smithery configuration file: https://smithery.ai/docs/config
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - fmpApiKey
+    properties:
+      fmpApiKey:
+        type: string
+        description: Financial Modeling Prep API key. Get one at https://financialmodelingprep.com
+    additionalProperties: false
+  commandFunction: |-
+    (config) => ({command: 'npx', args: ['-y', 'toolstem-mcp-server'], env: {FMP_API_KEY: config.fmpApiKey}})
