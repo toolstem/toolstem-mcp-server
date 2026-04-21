@@ -100,6 +100,23 @@ export interface FmpStockGrade {
     previousGrade?: string;
     newGrade?: string;
 }
+export interface FmpScreenerResult {
+    symbol: string;
+    companyName?: string;
+    marketCap?: number | null;
+    sector?: string;
+    industry?: string;
+    beta?: number | null;
+    price?: number;
+    lastAnnualDividend?: number | null;
+    volume?: number;
+    exchange?: string;
+    exchangeShortName?: string;
+    country?: string;
+    isEtf?: boolean;
+    isFund?: boolean;
+    isActivelyTrading?: boolean;
+}
 export interface FmpKeyMetrics {
     symbol: string;
     date?: string;
@@ -374,5 +391,32 @@ export declare class FmpClient {
     getCashFlow(symbol: string, period?: Period): Promise<FmpCashFlow[] | null>;
     getRating(symbol: string): Promise<FmpRating | null>;
     getStockGrade(symbol: string): Promise<FmpStockGrade[] | null>;
+    /**
+     * Screen stocks by fundamental criteria.
+     * All filter params are optional; omit to not filter on that dimension.
+     */
+    screenStocks(params: {
+        sector?: string;
+        industry?: string;
+        exchange?: string;
+        country?: string;
+        marketCapMoreThan?: number;
+        marketCapLowerThan?: number;
+        priceMoreThan?: number;
+        priceLowerThan?: number;
+        betaMoreThan?: number;
+        betaLowerThan?: number;
+        volumeMoreThan?: number;
+        dividendMoreThan?: number;
+        isEtf?: boolean;
+        isFund?: boolean;
+        isActivelyTrading?: boolean;
+        limit?: number;
+    }): Promise<FmpScreenerResult[]>;
+    /**
+     * Batch quote — get quotes for multiple symbols in a single call.
+     * Symbols are comma-separated.
+     */
+    getBatchQuote(symbols: string[]): Promise<FmpQuote[]>;
 }
 //# sourceMappingURL=fmp.d.ts.map

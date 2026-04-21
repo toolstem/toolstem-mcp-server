@@ -122,5 +122,60 @@ export class FmpClient {
             return null;
         return data;
     }
+    /**
+     * Screen stocks by fundamental criteria.
+     * All filter params are optional; omit to not filter on that dimension.
+     */
+    async screenStocks(params) {
+        const queryParams = {};
+        if (params.sector !== undefined)
+            queryParams.sector = params.sector;
+        if (params.industry !== undefined)
+            queryParams.industry = params.industry;
+        if (params.exchange !== undefined)
+            queryParams.exchange = params.exchange;
+        if (params.country !== undefined)
+            queryParams.country = params.country;
+        if (params.marketCapMoreThan !== undefined)
+            queryParams.marketCapMoreThan = String(params.marketCapMoreThan);
+        if (params.marketCapLowerThan !== undefined)
+            queryParams.marketCapLowerThan = String(params.marketCapLowerThan);
+        if (params.priceMoreThan !== undefined)
+            queryParams.priceMoreThan = String(params.priceMoreThan);
+        if (params.priceLowerThan !== undefined)
+            queryParams.priceLowerThan = String(params.priceLowerThan);
+        if (params.betaMoreThan !== undefined)
+            queryParams.betaMoreThan = String(params.betaMoreThan);
+        if (params.betaLowerThan !== undefined)
+            queryParams.betaLowerThan = String(params.betaLowerThan);
+        if (params.volumeMoreThan !== undefined)
+            queryParams.volumeMoreThan = String(params.volumeMoreThan);
+        if (params.dividendMoreThan !== undefined)
+            queryParams.dividendMoreThan = String(params.dividendMoreThan);
+        if (params.isEtf !== undefined)
+            queryParams.isEtf = String(params.isEtf);
+        if (params.isFund !== undefined)
+            queryParams.isFund = String(params.isFund);
+        if (params.isActivelyTrading !== undefined)
+            queryParams.isActivelyTrading = String(params.isActivelyTrading);
+        if (params.limit !== undefined)
+            queryParams.limit = String(params.limit);
+        const data = await this.request('/company-screener', queryParams);
+        if (!data || !Array.isArray(data))
+            return [];
+        return data;
+    }
+    /**
+     * Batch quote — get quotes for multiple symbols in a single call.
+     * Symbols are comma-separated.
+     */
+    async getBatchQuote(symbols) {
+        const data = await this.request('/batch-quote', {
+            symbols: symbols.join(','),
+        });
+        if (!data || !Array.isArray(data))
+            return [];
+        return data;
+    }
 }
 //# sourceMappingURL=fmp.js.map

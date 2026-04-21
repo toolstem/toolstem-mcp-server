@@ -2,9 +2,11 @@
 /**
  * Toolstem MCP Server — entry point.
  *
- * Exposes two curated financial intelligence tools:
+ * Exposes four curated financial intelligence tools:
  *   - get_stock_snapshot
  *   - get_company_metrics
+ *   - screen_stocks
+ *   - compare_companies
  *
  * Supports two transports:
  *   - stdio (default) — for Claude Desktop, Smithery, npm installs, etc.
@@ -20,6 +22,8 @@ import { z } from 'zod';
 
 import { getStockSnapshot } from './tools/get-stock-snapshot.js';
 import { getCompanyMetrics } from './tools/get-company-metrics.js';
+import { screenStocks } from './tools/screen-stocks.js';
+import { compareCompanies } from './tools/compare-companies.js';
 
 // -----------------------------------------------------------------------------
 // Zod schemas mirroring tool outputs (for structuredContent validation)
@@ -134,13 +138,122 @@ const CompanyMetricsShape = {
 };
 
 // -----------------------------------------------------------------------------
+// Zod schemas for screen_stocks output
+// -----------------------------------------------------------------------------
+
+const ScreenedStockShape = z.object({
+  symbol: z.string(),
+  company_name: z.string().nullable(),
+  sector: z.string().nullable(),
+  industry: z.string().nullable(),
+  exchange: z.string().nullable(),
+  country: z.string().nullable(),
+  price: z.number().nullable(),
+  market_cap: z.number().nullable(),
+  market_cap_readable: z.string().nullable(),
+  beta: z.number().nullable(),
+  volume: z.number().nullable(),
+  last_annual_dividend: z.number().nullable(),
+  cap_category: z.enum(['MEGA', 'LARGE', 'MID', 'SMALL', 'MICRO', 'NANO']).nullable(),
+  volatility_category: z.enum(['LOW', 'MODERATE', 'HIGH']).nullable(),
+  liquidity_category: z.enum(['HIGH', 'MODERATE', 'LOW']).nullable(),
+});
+
+const ScreenStocksOutputShape = {
+  query_summary: z.string(),
+  total_results: z.number(),
+  stocks: z.array(ScreenedStockShape),
+  meta: z.object({
+    source: z.string(),
+    timestamp: z.string(),
+    data_delay: z.string(),
+    filters_applied: z.array(z.string()),
+  }),
+};
+
+// -----------------------------------------------------------------------------
+// Zod schemas for compare_companies output
+// -----------------------------------------------------------------------------
+
+const CompanyComparisonShape = z.object({
+  symbol: z.string(),
+  company_name: z.string().nullable(),
+  sector: z.string().nullable(),
+  industry: z.string().nullable(),
+  price: z.object({
+    current: z.number().nullable(),
+    change_percent: z.number().nullable(),
+    year_high: z.number().nullable(),
+    year_low: z.number().nullable(),
+    distance_from_52w_high_percent: z.number().nullable(),
+  }),
+  valuation: z.object({
+    market_cap: z.number().nullable(),
+    market_cap_readable: z.string().nullable(),
+    pe_ratio: z.number().nullable(),
+    pb_ratio: z.number().nullable(),
+    ps_ratio: z.number().nullable(),
+    ev_to_ebitda: z.number().nullable(),
+    dcf_value: z.number().nullable(),
+    dcf_upside_percent: z.number().nullable(),
+  }),
+  profitability: z.object({
+    gross_margin: z.number().nullable(),
+    operating_margin: z.number().nullable(),
+    net_margin: z.number().nullable(),
+    roe: z.number().nullable(),
+    roa: z.number().nullable(),
+    roic: z.number().nullable(),
+  }),
+  financial_health: z.object({
+    debt_to_equity: z.number().nullable(),
+    current_ratio: z.number().nullable(),
+    interest_coverage: z.number().nullable(),
+  }),
+  growth: z.object({
+    revenue_growth_yoy: z.number().nullable(),
+    earnings_growth_yoy: z.number().nullable(),
+  }),
+  dividend: z.object({
+    dividend_yield: z.number().nullable(),
+    payout_ratio: z.number().nullable(),
+  }),
+  rating: z
+    .object({
+      score: z.number().nullable(),
+      recommendation: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+const CompareCompaniesOutputShape = {
+  symbols_compared: z.array(z.string()),
+  comparison_date: z.string(),
+  companies: z.array(CompanyComparisonShape),
+  rankings: z.object({
+    lowest_pe: z.string().nullable(),
+    highest_margin: z.string().nullable(),
+    strongest_balance_sheet: z.string().nullable(),
+    best_growth: z.string().nullable(),
+    most_undervalued: z.string().nullable(),
+    highest_rated: z.string().nullable(),
+  }),
+  meta: z.object({
+    source: z.string(),
+    timestamp: z.string(),
+    data_delay: z.string(),
+    api_calls_made: z.number(),
+  }),
+};
+
+// -----------------------------------------------------------------------------
 // Server factory
 // -----------------------------------------------------------------------------
 
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'toolstem-mcp-server',
-    version: '1.0.0',
+    version: '1.1.0',
   });
 
   server.registerTool(
@@ -201,6 +314,161 @@ export function createServer(): McpServer {
     },
   );
 
+  // -------------------------------------------------------------------------
+  // Tool 3: screen_stocks
+  // -------------------------------------------------------------------------
+
+  const VALID_SECTORS = [
+    'Technology',
+    'Consumer Cyclical',
+    'Energy',
+    'Industrials',
+    'Financial Services',
+    'Basic Materials',
+    'Communication Services',
+    'Consumer Defensive',
+    'Healthcare',
+    'Real Estate',
+    'Utilities',
+  ] as const;
+
+  const VALID_EXCHANGES = [
+    'NYSE',
+    'NASDAQ',
+    'AMEX',
+    'TSX',
+    'LSE',
+    'EURONEXT',
+    'XETRA',
+  ] as const;
+
+  server.registerTool(
+    'screen_stocks',
+    {
+      title: 'Stock Screener',
+      description:
+        'Screen and filter stocks by sector, market cap, price range, beta, volume, dividend yield, exchange, and country. Returns a curated list with derived signals — cap_category (MEGA/LARGE/MID/SMALL/MICRO/NANO), volatility_category (LOW/MODERATE/HIGH), and liquidity_category (HIGH/MODERATE/LOW). Use this to discover stocks matching specific investment criteria, build watchlists, or find opportunities within a sector.',
+      inputSchema: {
+        sector: z
+          .enum(VALID_SECTORS)
+          .optional()
+          .describe('Business sector to filter by'),
+        industry: z
+          .string()
+          .max(100)
+          .optional()
+          .describe('Specific industry (e.g., "Consumer Electronics", "Asset Management")'),
+        exchange: z
+          .enum(VALID_EXCHANGES)
+          .optional()
+          .describe('Stock exchange to filter by'),
+        country: z
+          .string()
+          .max(5)
+          .optional()
+          .describe('Country code (e.g., US, GB, DE, CA)'),
+        market_cap_min: z
+          .number()
+          .min(0)
+          .optional()
+          .describe('Minimum market cap in USD (e.g., 10000000000 for $10B)'),
+        market_cap_max: z
+          .number()
+          .min(0)
+          .optional()
+          .describe('Maximum market cap in USD'),
+        price_min: z
+          .number()
+          .min(0)
+          .optional()
+          .describe('Minimum stock price in USD'),
+        price_max: z
+          .number()
+          .min(0)
+          .optional()
+          .describe('Maximum stock price in USD'),
+        beta_min: z
+          .number()
+          .optional()
+          .describe('Minimum beta (e.g., 0.5 for lower-volatility stocks)'),
+        beta_max: z
+          .number()
+          .optional()
+          .describe('Maximum beta (e.g., 1.5 for moderate-volatility cap)'),
+        volume_min: z
+          .number()
+          .min(0)
+          .optional()
+          .describe('Minimum daily trading volume'),
+        dividend_min: z
+          .number()
+          .min(0)
+          .optional()
+          .describe('Minimum last annual dividend'),
+        is_etf: z
+          .boolean()
+          .optional()
+          .describe('Set true to include only ETFs, false to exclude ETFs. Omit to not filter by ETF status.'),
+        is_fund: z
+          .boolean()
+          .optional()
+          .describe('Set true to include only funds, false to exclude funds. Omit to not filter by fund status.'),
+        is_actively_trading: z
+          .boolean()
+          .default(true)
+          .describe('Only return actively trading securities. Defaults to true.'),
+        limit: z
+          .number()
+          .min(1)
+          .max(200)
+          .default(50)
+          .describe('Maximum results to return (1-200). Defaults to 50.'),
+      },
+      outputSchema: ScreenStocksOutputShape,
+    },
+    async (input) => {
+      const result = await screenStocks(input);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        structuredContent: result as unknown as { [key: string]: unknown },
+      };
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Tool 4: compare_companies
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    'compare_companies',
+    {
+      title: 'Company Comparison',
+      description:
+        'Side-by-side comparison of 2-5 companies across price, valuation (P/E, P/B, P/S, EV/EBITDA, DCF), profitability (margins, ROE, ROA, ROIC), financial health (D/E, current ratio, interest coverage), growth (revenue and earnings YoY), dividends, and analyst ratings. Returns derived rankings showing which company leads each dimension — lowest_pe, highest_margin, strongest_balance_sheet, best_growth, most_undervalued, highest_rated. Use this for investment comparisons, competitive analysis, or evaluating alternatives in the same sector.',
+      inputSchema: {
+        symbols: z
+          .array(
+            z
+              .string()
+              .min(1)
+              .max(10)
+              .regex(/^[A-Za-z0-9.^=-]+$/, 'Invalid ticker symbol format'),
+          )
+          .min(2)
+          .max(5)
+          .describe('2-5 stock ticker symbols to compare (e.g., ["AAPL", "MSFT", "GOOGL"])'),
+      },
+      outputSchema: CompareCompaniesOutputShape,
+    },
+    async ({ symbols }) => {
+      const result = await compareCompanies(symbols);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        structuredContent: result as unknown as { [key: string]: unknown },
+      };
+    },
+  );
+
   return server;
 }
 
@@ -250,7 +518,7 @@ async function runHttp(): Promise<void> {
   }, 60_000).unref();
 
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.0.0' });
+    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.1.0' });
   });
 
   app.post('/mcp', async (req: Request, res: Response) => {

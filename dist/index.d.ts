@@ -2,9 +2,11 @@
 /**
  * Toolstem MCP Server — entry point.
  *
- * Exposes two curated financial intelligence tools:
+ * Exposes four curated financial intelligence tools:
  *   - get_stock_snapshot
  *   - get_company_metrics
+ *   - screen_stocks
+ *   - compare_companies
  *
  * Supports two transports:
  *   - stdio (default) — for Claude Desktop, Smithery, npm installs, etc.

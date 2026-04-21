@@ -112,6 +112,24 @@ export interface FmpStockGrade {
   newGrade?: string;
 }
 
+export interface FmpScreenerResult {
+  symbol: string;
+  companyName?: string;
+  marketCap?: number | null;
+  sector?: string;
+  industry?: string;
+  beta?: number | null;
+  price?: number;
+  lastAnnualDividend?: number | null;
+  volume?: number;
+  exchange?: string;
+  exchangeShortName?: string;
+  country?: string;
+  isEtf?: boolean;
+  isFund?: boolean;
+  isActivelyTrading?: boolean;
+}
+
 export interface FmpKeyMetrics {
   symbol: string;
   date?: string;
@@ -509,6 +527,63 @@ export class FmpClient {
   async getStockGrade(symbol: string): Promise<FmpStockGrade[] | null> {
     const data = await this.request<FmpStockGrade[]>('/grades', { symbol });
     if (!data || !Array.isArray(data) || data.length === 0) return null;
+    return data;
+  }
+
+  /**
+   * Screen stocks by fundamental criteria.
+   * All filter params are optional; omit to not filter on that dimension.
+   */
+  async screenStocks(params: {
+    sector?: string;
+    industry?: string;
+    exchange?: string;
+    country?: string;
+    marketCapMoreThan?: number;
+    marketCapLowerThan?: number;
+    priceMoreThan?: number;
+    priceLowerThan?: number;
+    betaMoreThan?: number;
+    betaLowerThan?: number;
+    volumeMoreThan?: number;
+    dividendMoreThan?: number;
+    isEtf?: boolean;
+    isFund?: boolean;
+    isActivelyTrading?: boolean;
+    limit?: number;
+  }): Promise<FmpScreenerResult[]> {
+    const queryParams: Record<string, string | undefined> = {};
+    if (params.sector !== undefined) queryParams.sector = params.sector;
+    if (params.industry !== undefined) queryParams.industry = params.industry;
+    if (params.exchange !== undefined) queryParams.exchange = params.exchange;
+    if (params.country !== undefined) queryParams.country = params.country;
+    if (params.marketCapMoreThan !== undefined) queryParams.marketCapMoreThan = String(params.marketCapMoreThan);
+    if (params.marketCapLowerThan !== undefined) queryParams.marketCapLowerThan = String(params.marketCapLowerThan);
+    if (params.priceMoreThan !== undefined) queryParams.priceMoreThan = String(params.priceMoreThan);
+    if (params.priceLowerThan !== undefined) queryParams.priceLowerThan = String(params.priceLowerThan);
+    if (params.betaMoreThan !== undefined) queryParams.betaMoreThan = String(params.betaMoreThan);
+    if (params.betaLowerThan !== undefined) queryParams.betaLowerThan = String(params.betaLowerThan);
+    if (params.volumeMoreThan !== undefined) queryParams.volumeMoreThan = String(params.volumeMoreThan);
+    if (params.dividendMoreThan !== undefined) queryParams.dividendMoreThan = String(params.dividendMoreThan);
+    if (params.isEtf !== undefined) queryParams.isEtf = String(params.isEtf);
+    if (params.isFund !== undefined) queryParams.isFund = String(params.isFund);
+    if (params.isActivelyTrading !== undefined) queryParams.isActivelyTrading = String(params.isActivelyTrading);
+    if (params.limit !== undefined) queryParams.limit = String(params.limit);
+
+    const data = await this.request<FmpScreenerResult[]>('/company-screener', queryParams);
+    if (!data || !Array.isArray(data)) return [];
+    return data;
+  }
+
+  /**
+   * Batch quote — get quotes for multiple symbols in a single call.
+   * Symbols are comma-separated.
+   */
+  async getBatchQuote(symbols: string[]): Promise<FmpQuote[]> {
+    const data = await this.request<FmpQuote[]>('/batch-quote', {
+      symbols: symbols.join(','),
+    });
+    if (!data || !Array.isArray(data)) return [];
     return data;
   }
 }

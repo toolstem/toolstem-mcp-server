@@ -186,6 +186,123 @@ Deep fundamentals analysis — profitability, financial health, cash flow, growt
 
 ---
 
+### `screen_stocks`
+
+Screen and filter stocks by sector, market cap, price range, beta, volume, dividend yield, exchange, and country. Returns derived category signals for every match.
+
+**Input:**
+
+```json
+{
+  "sector": "Technology",
+  "market_cap_min": 10000000000,
+  "exchange": "NASDAQ",
+  "volume_min": 500000,
+  "limit": 20
+}
+```
+
+All parameters are optional — omit any filter to leave that dimension open.
+
+**Example output (truncated):**
+
+```json
+{
+  "query_summary": "20 stocks matching: sector=Technology, mktCap≥$10.0B, exchange=NASDAQ, volume≥500,000",
+  "total_results": 20,
+  "stocks": [
+    {
+      "symbol": "AAPL",
+      "company_name": "Apple Inc.",
+      "sector": "Technology",
+      "industry": "Consumer Electronics",
+      "exchange": "NASDAQ",
+      "country": "US",
+      "price": 178.52,
+      "market_cap": 2780000000000,
+      "market_cap_readable": "$2.78T",
+      "beta": 1.28,
+      "volume": 55000000,
+      "last_annual_dividend": 0.96,
+      "cap_category": "MEGA",
+      "volatility_category": "MODERATE",
+      "liquidity_category": "HIGH"
+    }
+  ],
+  "meta": {
+    "source": "Toolstem via Financial Modeling Prep",
+    "timestamp": "2026-04-20T18:30:00Z",
+    "data_delay": "Real-time during market hours",
+    "filters_applied": ["sector: Technology", "market_cap_min: 10000000000", "exchange: NASDAQ", "volume_min: 500000", "limit: 20"]
+  }
+}
+```
+
+**Derived fields:**
+
+- `cap_category` — `MEGA` (>$200B), `LARGE` ($10B–$200B), `MID` ($2B–$10B), `SMALL` ($300M–$2B), `MICRO` ($50M–$300M), `NANO` (<$50M).
+- `volatility_category` — `LOW` (beta < 0.8), `MODERATE` (0.8–1.3), `HIGH` (> 1.3).
+- `liquidity_category` — `HIGH` (volume > 1M), `MODERATE` (100K–1M), `LOW` (< 100K).
+
+---
+
+### `compare_companies`
+
+Side-by-side comparison of 2–5 companies across price, valuation, profitability, financial health, growth, dividends, and analyst ratings.
+
+**Input:**
+
+```json
+{
+  "symbols": ["AAPL", "MSFT", "GOOGL"]
+}
+```
+
+**Example output (truncated):**
+
+```json
+{
+  "symbols_compared": ["AAPL", "MSFT", "GOOGL"],
+  "comparison_date": "2026-04-20T18:30:00Z",
+  "companies": [
+    {
+      "symbol": "AAPL",
+      "company_name": "Apple Inc.",
+      "sector": "Technology",
+      "price": { "current": 178.52, "change_percent": 1.33 },
+      "valuation": { "pe_ratio": 29.5, "dcf_upside_percent": 9.35 },
+      "profitability": { "net_margin": 24.6, "roe": 160.5, "roic": 56.2 },
+      "financial_health": { "debt_to_equity": 1.87, "current_ratio": 1.07 },
+      "growth": { "revenue_growth_yoy": 7.8, "earnings_growth_yoy": 10.1 },
+      "dividend": { "dividend_yield": 0.5, "payout_ratio": 14.9 },
+      "rating": { "score": 4, "recommendation": "Buy" }
+    }
+  ],
+  "rankings": {
+    "lowest_pe": "GOOGL",
+    "highest_margin": "AAPL",
+    "strongest_balance_sheet": "GOOGL",
+    "best_growth": "MSFT",
+    "most_undervalued": "GOOGL",
+    "highest_rated": "MSFT"
+  },
+  "meta": {
+    "source": "Toolstem via Financial Modeling Prep",
+    "timestamp": "2026-04-20T18:30:00Z",
+    "data_delay": "Real-time during market hours",
+    "api_calls_made": 19
+  }
+}
+```
+
+**Derived fields:**
+
+- `rankings` — automatically computed: `lowest_pe`, `highest_margin`, `strongest_balance_sheet`, `best_growth`, `most_undervalued`, `highest_rated`.
+- All valuation, profitability, health, and growth metrics pre-computed per company.
+- Uses batch quote for efficient multi-symbol price retrieval.
+
+---
+
 ## Installation
 
 ### npm
@@ -239,9 +356,19 @@ or
 
 ```json
 {
-  "tool": "get_company_metrics",
-  "symbol": "AAPL",
-  "period": "annual"
+  "tool": "screen_stocks",
+  "sector": "Technology",
+  "market_cap_min": 10000000000,
+  "limit": 20
+}
+```
+
+or
+
+```json
+{
+  "tool": "compare_companies",
+  "symbols": ["AAPL", "MSFT", "GOOGL"]
 }
 ```
 
@@ -292,7 +419,9 @@ src/
 │   └── fmp.ts        # Financial Modeling Prep API client
 ├── tools/
 │   ├── get-stock-snapshot.ts
-│   └── get-company-metrics.ts
+│   ├── get-company-metrics.ts
+│   ├── screen-stocks.ts
+│   └── compare-companies.ts
 └── utils/
     └── formatting.ts # Market cap formatting, CAGR, trend signals
 ```
