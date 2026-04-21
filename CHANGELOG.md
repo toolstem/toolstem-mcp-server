@@ -5,6 +5,11 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-04-20
+
+### Fixed
+- **Critical**: Apify Actor runs failed on startup with `ERR_MODULE_NOT_FOUND: apify` because the `apify` dependency was declared as optional and excluded from production builds. Moved `apify` from `optionalDependencies` to `dependencies` so it ships in the runtime container.
+
 ## [1.1.0] - 2026-04-20
 
 ### Added
