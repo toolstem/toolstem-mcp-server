@@ -24,7 +24,8 @@
     "start": "node dist/index.js",
     "start:http": "node dist/index.js --http",
     "start:actor": "node dist/actor.js",
-    "dev": "tsx src/index.ts"
+    "dev": "tsx src/index.ts",
+    "smoke": "bash scripts/smoke-test.sh"
   },
   "keywords": [
     "mcp",
