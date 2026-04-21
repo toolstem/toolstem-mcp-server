@@ -56,11 +56,16 @@ async function main(): Promise<void> {
     await Actor.pushData(result as Record<string, unknown>);
 
     const chargeResult = await Actor.charge({ eventName: 'tool-call' });
-// eslint-disable-next-line no-console
-console.log('PPE charge result:', JSON.stringify(chargeResult));
+    // eslint-disable-next-line no-console
+    console.log('PPE charge result:', JSON.stringify(chargeResult));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Actor run failed:', err);
+    await Actor.fail(err instanceof Error ? err.message : String(err));
+  }
+}
 
-  
-  } main().catch(async (err) => {
+main().catch(async (err) => {
   // eslint-disable-next-line no-console
   console.error('Unhandled error:', err);
   try {
