@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Pre-publish smoke test for Toolstem MCP Server.
 # Calls every tool against the LIVE Apify Actor and fails loudly on any error,
-# empty response, or missing-data regression (e.g. upstream FMP paywall shifts).
+# empty response, missing-data regression, or missing PPE billing event.
 #
 # Usage:
-#   APIFY_TOKEN=xxx ./scripts/smoke-test.sh            # test live prod Actor
+#   APIFY_TOKEN=xxx ./scripts/smoke-test.sh
 #   APIFY_TOKEN=xxx ACTOR=toolstem~toolstem-mcp-server-staging ./scripts/smoke-test.sh
 #
 # Exit code 0 = all tools healthy, safe to publish.
@@ -15,7 +15,9 @@ set -euo pipefail
 : "${APIFY_TOKEN:?APIFY_TOKEN env var is required}"
 ACTOR="${ACTOR:-toolstem~toolstem-mcp-server}"
 TIMEOUT="${TIMEOUT:-120}"
-BASE="https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${TIMEOUT}"
+
+DATA_BASE="https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${TIMEOUT}"
+RUN_BASE="https://api.apify.com/v2/acts/${ACTOR}/runs"
 
 PASS=0
 FAIL=0
@@ -26,8 +28,17 @@ call_tool() {
   local name="$1"
   local payload="$2"
   local response
-  response=$(curl -sS -X POST "$BASE" -H "Content-Type: application/json" -d "$payload" 2>&1)
+  response=$(curl -sS -X POST "$DATA_BASE" -H "Content-Type: application/json" -d "$payload" 2>&1)
   echo "$response"
+}
+
+run_and_get_run_json() {
+  local payload="$1"
+  local run_response
+  run_response=$(curl -sS -X POST "${RUN_BASE}?token=${APIFY_TOKEN}&waitForFinish=${TIMEOUT}" \
+    -H "Content-Type: application/json" \
+    -d "$payload")
+  echo "$run_response"
 }
 
 check() {
@@ -51,6 +62,36 @@ warn() {
   WARN=$((WARN+1))
 }
 
+check_billing() {
+  local label="$1"
+  local run_json="$2"
+
+  local status
+  status=$(echo "$run_json" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+print(d.get('status',''))
+" 2>/dev/null || echo "")
+
+  local tool_calls
+  tool_calls=$(echo "$run_json" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+cc = d.get('chargedEventCounts', {}) or {}
+print(cc.get('tool-call', 0))
+" 2>/dev/null || echo "0")
+
+  if [ "$status" != "SUCCEEDED" ]; then
+    check "$label status=SUCCEEDED" 0 "status=$status"
+  else
+    if [ "$tool_calls" = "1" ]; then
+      check "$label chargedEventCounts.tool-call==1" 1
+    else
+      check "$label chargedEventCounts.tool-call==1" 0 "got $tool_calls"
+    fi
+  fi
+}
+
 echo "=========================================="
 echo "Toolstem smoke test"
 echo "Actor: $ACTOR"
@@ -59,7 +100,7 @@ echo "=========================================="
 
 # --- Test 1: get_stock_snapshot ---
 echo ""
-echo "[1/4] get_stock_snapshot (AAPL)"
+echo "[1/6] get_stock_snapshot (AAPL) – functional"
 RESP=$(call_tool "get_stock_snapshot" '{"tool":"get_stock_snapshot","symbol":"AAPL"}')
 # HTTP-level error from Apify input validator
 ERR=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('error',{}).get('message','')) if isinstance(d,dict) else print('')" 2>/dev/null || echo "parse-error")
@@ -78,9 +119,14 @@ else
   fi
 fi
 
+echo ""
+echo "[2/6] get_stock_snapshot (AAPL) – billing"
+RUN_JSON=$(run_and_get_run_json '{"tool":"get_stock_snapshot","symbol":"AAPL"}')
+check_billing "get_stock_snapshot billing" "$RUN_JSON"
+
 # --- Test 2: get_company_metrics ---
 echo ""
-echo "[2/4] get_company_metrics (AAPL)"
+echo "[3/6] get_company_metrics (AAPL) – functional"
 RESP=$(call_tool "get_company_metrics" '{"tool":"get_company_metrics","symbol":"AAPL"}')
 REV=$(echo "$RESP" | python3 -c "
 import json, sys
@@ -102,9 +148,14 @@ print(r if r else '')
 " 2>/dev/null || echo "")
 [ -n "$REV" ] && check "revenue > 0" 1 || check "revenue > 0" 0 "no revenue field found"
 
+echo ""
+echo "[4/6] get_company_metrics (AAPL) – billing"
+RUN_JSON=$(run_and_get_run_json '{"tool":"get_company_metrics","symbol":"AAPL"}')
+check_billing "get_company_metrics billing" "$RUN_JSON"
+
 # --- Test 3: compare_companies ---
 echo ""
-echo "[3/4] compare_companies (AAPL, MSFT)"
+echo "[5/6] compare_companies (AAPL, MSFT) – functional"
 RESP=$(call_tool "compare_companies" '{"tool":"compare_companies","symbols":["AAPL","MSFT"]}')
 N=$(echo "$RESP" | python3 -c "
 import json, sys
@@ -115,9 +166,14 @@ print(len(companies) if isinstance(companies, list) else 0)
 " 2>/dev/null || echo "0")
 [ "$N" = "2" ] && check "2 companies returned" 1 || check "2 companies returned" 0 "got $N"
 
+echo ""
+echo "[6/6] compare_companies (AAPL, MSFT) – billing"
+RUN_JSON=$(run_and_get_run_json '{"tool":"compare_companies","symbols":["AAPL","MSFT"]}')
+check_billing "compare_companies billing" "$RUN_JSON"
+
 # --- Test 4: screen_stocks should be REJECTED (removed in v1.2.2) ---
 echo ""
-echo "[4/4] screen_stocks (should be rejected — removed in v1.2.2)"
+echo "[extra] screen_stocks (should be rejected — removed in v1.2.2)"
 RESP=$(call_tool "screen_stocks" '{"tool":"screen_stocks","sector":"Technology"}')
 REJECTED=$(echo "$RESP" | python3 -c "
 import json, sys
