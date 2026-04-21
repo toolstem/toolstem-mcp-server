@@ -401,6 +401,10 @@ export type Period = 'annual' | 'quarter';
 export class FmpClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  // v1.2.1 diagnostic: per-chunk stats from the last screenStocks call
+  public _lastScreenDiag: Array<{ size: number; returned: number; ms: number }> = [];
+  public _lastHttpStatus: number | null = null;
+  public _lastHttpBody: string = '';
 
   constructor(apiKey?: string, baseUrl: string = FMP_BASE_URL) {
     const key = apiKey ?? process.env.FMP_API_KEY;
@@ -433,10 +437,14 @@ export class FmpClient {
         signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) {
-        // Diagnostic: log non-OK responses to stderr (Apify captures these)
+        // Diagnostic: log non-OK responses to stdout (Apify captures stderr
+        // inconsistently under LIMITED_PERMISSIONS)
         let errBody = '';
         try { errBody = (await res.text()).slice(0, 500); } catch { /* ignore */ }
-        console.error(`[FMP] HTTP ${res.status} for ${path} — body: ${errBody}`);
+        // eslint-disable-next-line no-console
+        console.log(`[FMP] HTTP ${res.status} for ${path} — body: ${errBody}`);
+        this._lastHttpStatus = res.status;
+        this._lastHttpBody = errBody;
         return null;
       }
       const body = (await res.json()) as unknown;
@@ -607,8 +615,20 @@ export class FmpClient {
       chunks.push(symbols.slice(i, i + BATCH_SIZE));
     }
 
-    const quoteBatches = await Promise.all(chunks.map((c) => this.getBatchQuote(c)));
-    const quotes: FmpQuote[] = quoteBatches.flat();
+    // v1.2.1: collect per-chunk diagnostics to surface in response when
+    // something goes wrong (Apify stderr swallowed under LIMITED_PERMISSIONS).
+    const chunkResults = await Promise.all(
+      chunks.map(async (c, i) => {
+        const t0 = Date.now();
+        const data = await this.getBatchQuote(c);
+        const ms = Date.now() - t0;
+        // eslint-disable-next-line no-console
+        console.log(`[screen_stocks] chunk ${i} size=${c.length} returned=${data.length} in ${ms}ms`);
+        return { size: c.length, returned: data.length, ms, data };
+      }),
+    );
+    this._lastScreenDiag = chunkResults.map(({ size, returned, ms }) => ({ size, returned, ms }));
+    const quotes: FmpQuote[] = chunkResults.flatMap((r) => r.data);
 
     // Apply remaining filters in-memory.
     const results: FmpScreenerResult[] = [];

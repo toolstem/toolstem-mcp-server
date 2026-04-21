@@ -376,6 +376,13 @@ export type Period = 'annual' | 'quarter';
 export declare class FmpClient {
     private readonly apiKey;
     private readonly baseUrl;
+    _lastScreenDiag: Array<{
+        size: number;
+        returned: number;
+        ms: number;
+    }>;
+    _lastHttpStatus: number | null;
+    _lastHttpBody: string;
     constructor(apiKey?: string, baseUrl?: string);
     /**
      * Low-level GET helper. Returns parsed JSON, or null on empty/error.
@@ -392,8 +399,27 @@ export declare class FmpClient {
     getRating(symbol: string): Promise<FmpRating | null>;
     getStockGrade(symbol: string): Promise<FmpStockGrade[] | null>;
     /**
-     * Screen stocks by fundamental criteria.
-     * All filter params are optional; omit to not filter on that dimension.
+     * Screen stocks by fundamental criteria — synthetic implementation.
+     *
+     * FMP's `/company-screener` requires a paid plan (HTTP 402 on free tier).
+     * We instead operate over a fixed Russell 1000 universe (src/data/universe.ts):
+     * batch-fetch live quotes for the full universe via `/batch-quote`
+     * (free-tier), merge sector data from the universe file, and filter
+     * in-memory.
+     *
+     * Supported filters: sector, marketCap (min/max), price (min/max), volume
+     * (min), isEtf, isFund, isActivelyTrading, limit.
+     *
+     * NOT supported at this time (filters silently ignored, surfaced in the
+     * tool-level response metadata):
+     *   - industry (iShares CSV has no sub-industry)
+     *   - beta (not in /quote; would require /profile per symbol)
+     *   - dividendMoreThan (not in /quote; would require /profile per symbol)
+     *   - exchange (Russell 1000 is always NYSE/NASDAQ)
+     *   - country (Russell 1000 is always US)
+     *
+     * Returns results in the same `FmpScreenerResult` shape as the paid
+     * endpoint so downstream code is unchanged.
      */
     screenStocks(params: {
         sector?: string;

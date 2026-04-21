@@ -1,6 +1,6 @@
 {
   "name": "toolstem-mcp-server",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Agent-ready financial intelligence MCP tools by Toolstem",
   "type": "module",
   "main": "dist/index.js",
@@ -26,7 +26,13 @@
     "start:actor": "node dist/actor.js",
     "dev": "tsx src/index.ts"
   },
-  "keywords": ["mcp", "financial-data", "stock-market", "ai-agent", "toolstem"],
+  "keywords": [
+    "mcp",
+    "financial-data",
+    "stock-market",
+    "ai-agent",
+    "toolstem"
+  ],
   "author": "Toolstem",
   "license": "MIT",
   "repository": {

@@ -151,7 +151,7 @@ function buildFiltersApplied(input: ScreenStocksInput): string[] {
 export async function screenStocks(
   input: ScreenStocksInput,
   client?: FmpClient,
-): Promise<ScreenStocksResult> {
+): Promise<ScreenStocksResult & { meta: { diagnostics?: unknown } }> {
   const fmp = client ?? new FmpClient();
 
   // Clamp limit: default 50, max 200
@@ -237,6 +237,12 @@ export async function screenStocks(
       },
       unsupported_filters: unsupported.length > 0 ? unsupported : undefined,
       notes,
+      // v1.2.1 diagnostics — remove in v1.2.2 once issue resolved
+      diagnostics: {
+        chunks: fmp._lastScreenDiag,
+        last_http_status: fmp._lastHttpStatus,
+        last_http_body: fmp._lastHttpBody,
+      },
     },
   };
 }

@@ -5,6 +5,20 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-04-20
+
+### Fixed — v1.2.0 screen_stocks returning 0 results (diagnostic build)
+
+Post-publish QA found `screen_stocks` returns 0 results on the live Apify Actor despite the Russell 1000 universe being present. Apify swallows `console.error` output under `LIMITED_PERMISSIONS`, so root cause was unobservable in logs.
+
+v1.2.1 is a diagnostic release that surfaces the failure point directly in the response body:
+
+- Per-chunk batch-quote stats (`size`, `returned`, `ms`) in `meta.diagnostics.chunks`
+- Last non-OK HTTP status and response body in `meta.diagnostics.last_http_status` / `last_http_body`
+- Switched FMP error logging from `console.error` to `console.log` so Apify captures it
+
+This is a temporary diagnostic build — `meta.diagnostics` will be removed once the batch-quote issue is confirmed and fixed.
+
 ## [1.2.0] - 2026-04-20
 
 ### Changed — `screen_stocks` now works on FMP's free tier
