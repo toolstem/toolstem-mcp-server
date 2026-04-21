@@ -1,5 +1,10 @@
 # Toolstem MCP Server
 
+[![npm version](https://img.shields.io/npm/v/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-teal)](https://registry.modelcontextprotocol.io)
+[![Apify Store](https://img.shields.io/badge/Apify_Store-$0.005%2Fcall-blue)](https://apify.com/toolstem/toolstem-mcp-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+
 **Agent-ready financial intelligence tools — curated, not raw.**
 
 Toolstem is an MCP (Model Context Protocol) server that turns raw financial market data into curated, synthesized intelligence for AI agents. Unlike passthrough wrappers that just expose a vendor's REST API, every Toolstem tool **combines multiple data sources**, **derives signals**, and **pre-computes the math** an agent would otherwise have to do itself.
@@ -218,10 +223,6 @@ Add to your `claude_desktop_config.json`:
   }
 }
 ```
-
-### Smithery
-
-Toolstem is distributed on Smithery for one-click installation into supported MCP clients.
 
 ### Apify
 
