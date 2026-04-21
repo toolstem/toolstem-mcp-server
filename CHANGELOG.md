@@ -5,6 +5,36 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-20
+
+### Changed — `screen_stocks` now works on FMP's free tier
+
+FMP's `/company-screener` endpoint requires a paid plan (HTTP 402 on free tier), so `screen_stocks` was silently returning zero results for every free-tier user. v1.2.0 replaces the call with a **synthetic screener** that works on the free tier:
+
+- Screens over a fixed **Russell 1000** universe (~1,000 US large/mid-cap stocks, ~93% of US equity market cap) baked into the server at build time.
+- Fetches live quotes for the universe via FMP's free-tier `/batch-quote` endpoint and filters in-memory.
+- Response time: ~2–4s for the full universe, <1s when filtered by sector.
+- Sector names normalized to FMP taxonomy (e.g., `Information Technology` → `Technology`, `Health Care` → `Healthcare`).
+- Results sorted by market cap descending.
+
+### Added
+- **Universe metadata in every `screen_stocks` response**: `meta.universe` surfaces the universe name (`russell-1000`), description, size (1003), and country (US). Agents can now detect scope and caveat their output appropriately.
+- **Unsupported-filter transparency**: `meta.unsupported_filters` lists any filters that were passed but cannot be honored by the free-tier screener. `meta.notes` explains the limitation in plain language.
+- Diagnostic stderr logging in FMP request layer (from superseded 1.1.3 work): non-OK HTTP responses, error-message payloads, fetch exceptions, and empty-body cases log to `console.error` for visibility in Apify Actor logs.
+
+### Removed / Limitations
+The synthetic screener cannot honor these filters on the free tier (they are accepted and surfaced as `unsupported_filters` in the response):
+- `industry` — iShares data has no GICS sub-industry.
+- `beta_min` / `beta_max` — not present in `/batch-quote` payload.
+- `dividend_min` — not present in `/batch-quote` payload.
+- `exchange` — Russell 1000 is always NYSE/NASDAQ.
+- `country` — Russell 1000 is always US (non-US country filters return unsupported).
+
+To use these filters, upgrade to an FMP Starter plan ($19/mo) and revert to the paid `/company-screener` endpoint.
+
+### Docs
+- README updated with universe-scope disclosure and filter support matrix.
+
 ## [1.1.2] - 2026-04-20
 
 ### Fixed

@@ -4,6 +4,8 @@
  * on empty/errored responses so callers can handle graceful degradation.
  */
 
+import { RUSSELL_1000, UNIVERSE_METADATA, UNIVERSE_BY_SYMBOL } from '../data/universe.js';
+
 const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
 
 // -----------------------------------------------------------------------------
@@ -431,20 +433,32 @@ export class FmpClient {
         signal: AbortSignal.timeout(15_000),
       });
       if (!res.ok) {
+        // Diagnostic: log non-OK responses to stderr (Apify captures these)
+        let errBody = '';
+        try { errBody = (await res.text()).slice(0, 500); } catch { /* ignore */ }
+        console.error(`[FMP] HTTP ${res.status} for ${path} — body: ${errBody}`);
         return null;
       }
       const body = (await res.json()) as unknown;
-      if (body === null || body === undefined) return null;
-      if (Array.isArray(body) && body.length === 0) return null;
+      if (body === null || body === undefined) {
+        console.error(`[FMP] null/undefined body for ${path}`);
+        return null;
+      }
+      if (Array.isArray(body) && body.length === 0) {
+        console.error(`[FMP] empty array for ${path}`);
+        return null;
+      }
       if (
         typeof body === 'object' &&
         body !== null &&
         'Error Message' in (body as Record<string, unknown>)
       ) {
+        console.error(`[FMP] Error Message for ${path}: ${JSON.stringify(body)}`);
         return null;
       }
       return body as T;
-    } catch {
+    } catch (err) {
+      console.error(`[FMP] fetch threw for ${path}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
   }
@@ -531,8 +545,27 @@ export class FmpClient {
   }
 
   /**
-   * Screen stocks by fundamental criteria.
-   * All filter params are optional; omit to not filter on that dimension.
+   * Screen stocks by fundamental criteria — synthetic implementation.
+   *
+   * FMP's `/company-screener` requires a paid plan (HTTP 402 on free tier).
+   * We instead operate over a fixed Russell 1000 universe (src/data/universe.ts):
+   * batch-fetch live quotes for the full universe via `/batch-quote`
+   * (free-tier), merge sector data from the universe file, and filter
+   * in-memory.
+   *
+   * Supported filters: sector, marketCap (min/max), price (min/max), volume
+   * (min), isEtf, isFund, isActivelyTrading, limit.
+   *
+   * NOT supported at this time (filters silently ignored, surfaced in the
+   * tool-level response metadata):
+   *   - industry (iShares CSV has no sub-industry)
+   *   - beta (not in /quote; would require /profile per symbol)
+   *   - dividendMoreThan (not in /quote; would require /profile per symbol)
+   *   - exchange (Russell 1000 is always NYSE/NASDAQ)
+   *   - country (Russell 1000 is always US)
+   *
+   * Returns results in the same `FmpScreenerResult` shape as the paid
+   * endpoint so downstream code is unchanged.
    */
   async screenStocks(params: {
     sector?: string;
@@ -552,27 +585,75 @@ export class FmpClient {
     isActivelyTrading?: boolean;
     limit?: number;
   }): Promise<FmpScreenerResult[]> {
-    const queryParams: Record<string, string | undefined> = {};
-    if (params.sector !== undefined) queryParams.sector = params.sector;
-    if (params.industry !== undefined) queryParams.industry = params.industry;
-    if (params.exchange !== undefined) queryParams.exchange = params.exchange;
-    if (params.country !== undefined) queryParams.country = params.country;
-    if (params.marketCapMoreThan !== undefined) queryParams.marketCapMoreThan = String(params.marketCapMoreThan);
-    if (params.marketCapLowerThan !== undefined) queryParams.marketCapLowerThan = String(params.marketCapLowerThan);
-    if (params.priceMoreThan !== undefined) queryParams.priceMoreThan = String(params.priceMoreThan);
-    if (params.priceLowerThan !== undefined) queryParams.priceLowerThan = String(params.priceLowerThan);
-    if (params.betaMoreThan !== undefined) queryParams.betaMoreThan = String(params.betaMoreThan);
-    if (params.betaLowerThan !== undefined) queryParams.betaLowerThan = String(params.betaLowerThan);
-    if (params.volumeMoreThan !== undefined) queryParams.volumeMoreThan = String(params.volumeMoreThan);
-    if (params.dividendMoreThan !== undefined) queryParams.dividendMoreThan = String(params.dividendMoreThan);
-    if (params.isEtf !== undefined) queryParams.isEtf = String(params.isEtf);
-    if (params.isFund !== undefined) queryParams.isFund = String(params.isFund);
-    if (params.isActivelyTrading !== undefined) queryParams.isActivelyTrading = String(params.isActivelyTrading);
-    if (params.limit !== undefined) queryParams.limit = String(params.limit);
+    // Short-circuit: Russell 1000 universe is all operating companies,
+    // not ETFs or funds. If the caller insists on ETFs/funds we return empty.
+    if (params.isEtf === true) return [];
+    if (params.isFund === true) return [];
 
-    const data = await this.request<FmpScreenerResult[]>('/company-screener', queryParams);
-    if (!data || !Array.isArray(data)) return [];
-    return data;
+    // Sector filter: match case-insensitively against universe sectors.
+    let candidates: readonly { symbol: string; sector: string }[] = RUSSELL_1000;
+    if (params.sector) {
+      const needle = params.sector.toLowerCase();
+      candidates = candidates.filter((e) => e.sector.toLowerCase() === needle);
+      if (candidates.length === 0) return [];
+    }
+
+    // Batch the universe into /batch-quote calls. FMP accepts many symbols
+    // per call; we chunk at 100 to stay safely under URL length limits.
+    const BATCH_SIZE = 100;
+    const symbols = candidates.map((e) => e.symbol);
+    const chunks: string[][] = [];
+    for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+      chunks.push(symbols.slice(i, i + BATCH_SIZE));
+    }
+
+    const quoteBatches = await Promise.all(chunks.map((c) => this.getBatchQuote(c)));
+    const quotes: FmpQuote[] = quoteBatches.flat();
+
+    // Apply remaining filters in-memory.
+    const results: FmpScreenerResult[] = [];
+    for (const q of quotes) {
+      if (!q.symbol) continue;
+      const universeEntry = UNIVERSE_BY_SYMBOL.get(q.symbol);
+      // Defensive: skip anything not in the universe (shouldn't happen).
+      if (!universeEntry) continue;
+
+      const marketCap = typeof q.marketCap === 'number' ? q.marketCap : null;
+      const price = typeof q.price === 'number' ? q.price : null;
+      const volume = typeof q.volume === 'number' ? q.volume : null;
+
+      if (params.marketCapMoreThan !== undefined && (marketCap === null || marketCap < params.marketCapMoreThan)) continue;
+      if (params.marketCapLowerThan !== undefined && (marketCap === null || marketCap > params.marketCapLowerThan)) continue;
+      if (params.priceMoreThan !== undefined && (price === null || price < params.priceMoreThan)) continue;
+      if (params.priceLowerThan !== undefined && (price === null || price > params.priceLowerThan)) continue;
+      if (params.volumeMoreThan !== undefined && (volume === null || volume < params.volumeMoreThan)) continue;
+
+      results.push({
+        symbol: q.symbol,
+        companyName: q.name,
+        marketCap: marketCap,
+        sector: universeEntry.sector,
+        // industry/beta/lastAnnualDividend not populated — require paid endpoints
+        industry: undefined,
+        beta: null,
+        price: price ?? undefined,
+        lastAnnualDividend: null,
+        volume: volume ?? undefined,
+        exchange: q.exchange,
+        exchangeShortName: q.exchange,
+        country: UNIVERSE_METADATA.country,
+        isEtf: false,
+        isFund: false,
+        isActivelyTrading: true,
+      });
+    }
+
+    // Sort by market cap descending (largest first) — matches what paid
+    // screener returns by default and is the most useful order for agents.
+    results.sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0));
+
+    const limit = params.limit ?? 50;
+    return results.slice(0, limit);
   }
 
   /**

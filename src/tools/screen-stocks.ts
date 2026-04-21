@@ -6,6 +6,7 @@
  */
 
 import { FmpClient } from '../services/fmp.js';
+import { UNIVERSE_METADATA, UNIVERSE_SECTORS } from '../data/universe.js';
 import { formatMarketCap, round2, safeNumber } from '../utils/formatting.js';
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,14 @@ export interface ScreenStocksResult {
     timestamp: string;
     data_delay: string;
     filters_applied: string[];
+    universe: {
+      name: string;
+      description: string;
+      size: number;
+      country: string;
+    };
+    unsupported_filters?: string[];
+    notes?: string[];
   };
 }
 
@@ -148,6 +157,15 @@ export async function screenStocks(
   // Clamp limit: default 50, max 200
   const requestLimit = Math.min(input.limit ?? 50, 200);
 
+  // Track filters that the synthetic screener cannot honor — caller must know.
+  const unsupported: string[] = [];
+  if (input.industry !== undefined) unsupported.push('industry');
+  if (input.beta_min !== undefined) unsupported.push('beta_min');
+  if (input.beta_max !== undefined) unsupported.push('beta_max');
+  if (input.dividend_min !== undefined) unsupported.push('dividend_min');
+  if (input.exchange !== undefined) unsupported.push('exchange');
+  if (input.country !== undefined && input.country.toUpperCase() !== 'US') unsupported.push('country');
+
   const raw = await fmp.screenStocks({
     sector: input.sector,
     industry: input.industry,
@@ -192,6 +210,16 @@ export async function screenStocks(
     };
   });
 
+  const notes: string[] = [
+    `Screening universe: ${UNIVERSE_METADATA.description}.`,
+    `Supported filters: sector (one of ${UNIVERSE_SECTORS.join(', ')}), market_cap_min/max, price_min/max, volume_min, limit. Results sorted by market cap descending.`,
+  ];
+  if (unsupported.length > 0) {
+    notes.push(
+      `Filter${unsupported.length > 1 ? 's' : ''} not supported by the free-tier synthetic screener and ignored: ${unsupported.join(', ')}. Upgrade to FMP Starter+ for full filter coverage.`,
+    );
+  }
+
   return {
     query_summary: buildQuerySummary(input, stocks.length),
     total_results: stocks.length,
@@ -201,6 +229,14 @@ export async function screenStocks(
       timestamp: new Date().toISOString(),
       data_delay: 'Real-time during market hours',
       filters_applied: buildFiltersApplied(input),
+      universe: {
+        name: UNIVERSE_METADATA.name,
+        description: UNIVERSE_METADATA.description,
+        size: UNIVERSE_METADATA.size,
+        country: UNIVERSE_METADATA.country,
+      },
+      unsupported_filters: unsupported.length > 0 ? unsupported : undefined,
+      notes,
     },
   };
 }

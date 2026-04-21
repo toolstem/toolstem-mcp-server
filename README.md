@@ -188,7 +188,15 @@ Deep fundamentals analysis — profitability, financial health, cash flow, growt
 
 ### `screen_stocks`
 
-Screen and filter stocks by sector, market cap, price range, beta, volume, dividend yield, exchange, and country. Returns derived category signals for every match.
+Screen and filter US large/mid-cap stocks by sector, market cap, price, and volume. Returns derived category signals for every match.
+
+**Universe:** Russell 1000 (~1,000 US large/mid-cap stocks, ~93% of US equity market cap). Scope is always surfaced in `meta.universe`.
+
+**Supported filters (honored):** `sector`, `market_cap_min`, `market_cap_max`, `price_min`, `price_max`, `volume_min`, `limit`.
+
+**Unsupported on free tier (accepted but ignored, listed in `meta.unsupported_filters`):** `industry`, `beta_min`, `beta_max`, `dividend_min`, `exchange`, `country` (non-US). FMP's paid `/company-screener` endpoint is required for full filter coverage.
+
+**Sector values (case-insensitive):** Technology, Healthcare, Financial Services, Consumer Cyclical, Consumer Defensive, Industrials, Energy, Basic Materials, Real Estate, Communication Services, Utilities.
 
 **Input:**
 
@@ -196,7 +204,6 @@ Screen and filter stocks by sector, market cap, price range, beta, volume, divid
 {
   "sector": "Technology",
   "market_cap_min": 10000000000,
-  "exchange": "NASDAQ",
   "volume_min": 500000,
   "limit": 20
 }
@@ -233,7 +240,17 @@ All parameters are optional — omit any filter to leave that dimension open.
     "source": "Toolstem via Financial Modeling Prep",
     "timestamp": "2026-04-20T18:30:00Z",
     "data_delay": "Real-time during market hours",
-    "filters_applied": ["sector: Technology", "market_cap_min: 10000000000", "exchange: NASDAQ", "volume_min: 500000", "limit: 20"]
+    "filters_applied": ["sector: Technology", "market_cap_min: 10000000000", "volume_min: 500000", "limit: 20"],
+    "universe": {
+      "name": "russell-1000",
+      "description": "Russell 1000 — top ~1,000 US companies by market cap (~93% of US equity market cap)",
+      "size": 1003,
+      "country": "US"
+    },
+    "notes": [
+      "Screening universe: Russell 1000 — top ~1,000 US companies by market cap (~93% of US equity market cap).",
+      "Supported filters: sector, market_cap_min/max, price_min/max, volume_min, limit. Results sorted by market cap descending."
+    ]
   }
 }
 ```
