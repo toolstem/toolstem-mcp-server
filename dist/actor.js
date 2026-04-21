@@ -6,7 +6,6 @@
 import { Actor } from 'apify';
 import { getStockSnapshot } from './tools/get-stock-snapshot.js';
 import { getCompanyMetrics } from './tools/get-company-metrics.js';
-import { screenStocks } from './tools/screen-stocks.js';
 import { compareCompanies } from './tools/compare-companies.js';
 async function main() {
     await Actor.init();
@@ -32,26 +31,6 @@ async function main() {
             const period = input.period === 'quarter' ? 'quarter' : 'annual';
             result = await getCompanyMetrics(input.symbol, period);
         }
-        else if (input.tool === 'screen_stocks') {
-            result = await screenStocks({
-                sector: input.sector,
-                industry: input.industry,
-                exchange: input.exchange,
-                country: input.country,
-                market_cap_min: input.market_cap_min,
-                market_cap_max: input.market_cap_max,
-                price_min: input.price_min,
-                price_max: input.price_max,
-                beta_min: input.beta_min,
-                beta_max: input.beta_max,
-                volume_min: input.volume_min,
-                dividend_min: input.dividend_min,
-                is_etf: input.is_etf,
-                is_fund: input.is_fund,
-                is_actively_trading: input.is_actively_trading,
-                limit: input.limit,
-            });
-        }
         else if (input.tool === 'compare_companies') {
             if (!input.symbols || !Array.isArray(input.symbols) || input.symbols.length < 2) {
                 throw new Error('Input field "symbols" is required for compare_companies (array of 2-5 ticker symbols).');
@@ -59,7 +38,7 @@ async function main() {
             result = await compareCompanies(input.symbols);
         }
         else {
-            throw new Error(`Unknown tool: ${input.tool}. Valid tools: get_stock_snapshot, get_company_metrics, screen_stocks, compare_companies`);
+            throw new Error(`Unknown tool: ${input.tool}. Valid tools: get_stock_snapshot, get_company_metrics, compare_companies. (screen_stocks is temporarily disabled in v1.2.2 and will return in v1.3.)`);
         }
         // Push result to the default dataset.
         await Actor.pushData(result);

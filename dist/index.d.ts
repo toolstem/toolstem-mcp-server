@@ -2,11 +2,14 @@
 /**
  * Toolstem MCP Server — entry point.
  *
- * Exposes four curated financial intelligence tools:
+ * Exposes three curated financial intelligence tools:
  *   - get_stock_snapshot
  *   - get_company_metrics
- *   - screen_stocks
  *   - compare_companies
+ *
+ * Note: screen_stocks is temporarily disabled in v1.2.2. It relied on FMP's
+ * /stable/batch-quote endpoint, which now requires a paid subscription
+ * (HTTP 402 on free tier). Coming back in v1.3 with a refactored implementation.
  *
  * Supports two transports:
  *   - stdio (default) — for Claude Desktop, Smithery, npm installs, etc.

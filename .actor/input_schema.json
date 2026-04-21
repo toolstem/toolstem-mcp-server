@@ -1,6 +1,6 @@
 {
   "title": "Toolstem Financial Data",
-  "description": "Curated financial intelligence for AI agents — 4 tools: stock snapshot, company metrics, stock screener, company comparison",
+  "description": "Curated financial intelligence for AI agents — 3 tools: stock snapshot, company metrics, company comparison. (screen_stocks is temporarily disabled in v1.2.2 and will return in v1.3.)",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
@@ -8,7 +8,7 @@
       "title": "Tool",
       "type": "string",
       "description": "Which tool to run",
-      "enum": ["get_stock_snapshot", "get_company_metrics", "screen_stocks", "compare_companies"],
+      "enum": ["get_stock_snapshot", "get_company_metrics", "compare_companies"],
       "default": "get_stock_snapshot",
       "editor": "select"
     },
@@ -33,102 +33,6 @@
       "description": "2-5 stock ticker symbols for compare_companies (e.g., [\"AAPL\", \"MSFT\", \"GOOGL\"])",
       "editor": "stringList",
       "items": { "type": "string" }
-    },
-    "sector": {
-      "title": "Sector",
-      "type": "string",
-      "description": "Sector filter for screen_stocks (e.g., Technology, Healthcare, Energy)",
-      "editor": "textfield"
-    },
-    "industry": {
-      "title": "Industry",
-      "type": "string",
-      "description": "Industry filter for screen_stocks (e.g., Consumer Electronics, Asset Management)",
-      "editor": "textfield"
-    },
-    "exchange": {
-      "title": "Exchange",
-      "type": "string",
-      "description": "Exchange filter for screen_stocks (e.g., NYSE, NASDAQ, AMEX)",
-      "editor": "textfield"
-    },
-    "country": {
-      "title": "Country",
-      "type": "string",
-      "description": "Country code filter for screen_stocks (e.g., US, GB, DE)",
-      "editor": "textfield"
-    },
-    "market_cap_min": {
-      "title": "Market Cap Min",
-      "type": "integer",
-      "description": "Minimum market cap in USD for screen_stocks (e.g., 10000000000 for $10B)",
-      "editor": "number"
-    },
-    "market_cap_max": {
-      "title": "Market Cap Max",
-      "type": "integer",
-      "description": "Maximum market cap in USD for screen_stocks",
-      "editor": "number"
-    },
-    "price_min": {
-      "title": "Price Min",
-      "type": "number",
-      "description": "Minimum stock price for screen_stocks",
-      "editor": "number"
-    },
-    "price_max": {
-      "title": "Price Max",
-      "type": "number",
-      "description": "Maximum stock price for screen_stocks",
-      "editor": "number"
-    },
-    "beta_min": {
-      "title": "Beta Min",
-      "type": "number",
-      "description": "Minimum beta for screen_stocks",
-      "editor": "number"
-    },
-    "beta_max": {
-      "title": "Beta Max",
-      "type": "number",
-      "description": "Maximum beta for screen_stocks",
-      "editor": "number"
-    },
-    "volume_min": {
-      "title": "Volume Min",
-      "type": "integer",
-      "description": "Minimum average daily volume for screen_stocks",
-      "editor": "number"
-    },
-    "dividend_min": {
-      "title": "Dividend Min",
-      "type": "number",
-      "description": "Minimum dividend for screen_stocks",
-      "editor": "number"
-    },
-    "is_etf": {
-      "title": "Is ETF",
-      "type": "boolean",
-      "description": "Filter to ETFs only for screen_stocks",
-      "editor": "checkbox"
-    },
-    "is_fund": {
-      "title": "Is Fund",
-      "type": "boolean",
-      "description": "Filter to mutual funds only for screen_stocks",
-      "editor": "checkbox"
-    },
-    "is_actively_trading": {
-      "title": "Is Actively Trading",
-      "type": "boolean",
-      "description": "Filter to actively trading only for screen_stocks",
-      "editor": "checkbox"
-    },
-    "limit": {
-      "title": "Limit",
-      "type": "integer",
-      "description": "Maximum results for screen_stocks (default 50, max 200)",
-      "editor": "number"
     }
   },
   "required": ["tool"]

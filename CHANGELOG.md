@@ -5,6 +5,28 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-04-21
+
+### Removed — `screen_stocks` tool temporarily disabled
+
+v1.2.1 diagnostics confirmed the root cause of `screen_stocks` returning 0 results: FMP's `/stable/batch-quote` endpoint now returns HTTP 402 ("Restricted Endpoint") on the free tier. The diagnostic payload showed every batch request rejected with a subscription-required error regardless of chunk size.
+
+Rather than ship a broken tool, v1.2.2 removes `screen_stocks` from the public surface area:
+
+- Removed tool registration from the MCP server (`src/index.ts`).
+- Removed tool branch from the Apify Actor entry (`src/actor.ts`).
+- Removed `screen_stocks`-specific fields from the Apify input schema (`.actor/input_schema.json`).
+- Supported tools are now: `get_stock_snapshot`, `get_company_metrics`, `compare_companies`.
+
+The underlying source for the screener (`src/tools/screen-stocks.ts`, `src/services/fmp.ts` helpers, and the Russell 1000 universe in `src/data/universe.ts`) is retained in the repository for the v1.3 refactor, but is no longer reachable from any transport.
+
+`screen_stocks` will return in v1.3 built on FMP's free-tier-available `/api/v3/stock-screener` endpoint (server-side filtering, 1 API call instead of 11, supports filters previously stubbed out: `industry`, `beta`, `dividend`, `country`).
+
+### Other
+
+- Removed the v1.2.1 diagnostic plumbing (`_lastScreenDiag`, `_lastHttpStatus`, `_lastHttpBody`, per-chunk `meta.diagnostics`) — retained only within the now-inert `screenStocks` path in `fmp.ts` for v1.3 reference.
+- Updated the HTTP `/health` endpoint and `createServer()` to report version `1.2.2`.
+
 ## [1.2.1] - 2026-04-20
 
 ### Fixed — v1.2.0 screen_stocks returning 0 results (diagnostic build)

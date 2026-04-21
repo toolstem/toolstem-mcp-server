@@ -2,11 +2,14 @@
 /**
  * Toolstem MCP Server — entry point.
  *
- * Exposes four curated financial intelligence tools:
+ * Exposes three curated financial intelligence tools:
  *   - get_stock_snapshot
  *   - get_company_metrics
- *   - screen_stocks
  *   - compare_companies
+ *
+ * Note: screen_stocks is temporarily disabled in v1.2.2. It relied on FMP's
+ * /stable/batch-quote endpoint, which now requires a paid subscription
+ * (HTTP 402 on free tier). Coming back in v1.3 with a refactored implementation.
  *
  * Supports two transports:
  *   - stdio (default) — for Claude Desktop, Smithery, npm installs, etc.
@@ -20,7 +23,6 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { getStockSnapshot } from './tools/get-stock-snapshot.js';
 import { getCompanyMetrics } from './tools/get-company-metrics.js';
-import { screenStocks } from './tools/screen-stocks.js';
 import { compareCompanies } from './tools/compare-companies.js';
 // -----------------------------------------------------------------------------
 // Zod schemas mirroring tool outputs (for structuredContent validation)
@@ -131,37 +133,9 @@ const CompanyMetricsShape = {
         data_delay: z.string(),
     }),
 };
-// -----------------------------------------------------------------------------
-// Zod schemas for screen_stocks output
-// -----------------------------------------------------------------------------
-const ScreenedStockShape = z.object({
-    symbol: z.string(),
-    company_name: z.string().nullable(),
-    sector: z.string().nullable(),
-    industry: z.string().nullable(),
-    exchange: z.string().nullable(),
-    country: z.string().nullable(),
-    price: z.number().nullable(),
-    market_cap: z.number().nullable(),
-    market_cap_readable: z.string().nullable(),
-    beta: z.number().nullable(),
-    volume: z.number().nullable(),
-    last_annual_dividend: z.number().nullable(),
-    cap_category: z.enum(['MEGA', 'LARGE', 'MID', 'SMALL', 'MICRO', 'NANO']).nullable(),
-    volatility_category: z.enum(['LOW', 'MODERATE', 'HIGH']).nullable(),
-    liquidity_category: z.enum(['HIGH', 'MODERATE', 'LOW']).nullable(),
-});
-const ScreenStocksOutputShape = {
-    query_summary: z.string(),
-    total_results: z.number(),
-    stocks: z.array(ScreenedStockShape),
-    meta: z.object({
-        source: z.string(),
-        timestamp: z.string(),
-        data_delay: z.string(),
-        filters_applied: z.array(z.string()),
-    }),
-};
+// Note: screen_stocks Zod schemas removed in v1.2.2 alongside the tool
+// disable. They'll be reintroduced (likely restructured) when the tool ships
+// again in v1.3.
 // -----------------------------------------------------------------------------
 // Zod schemas for compare_companies output
 // -----------------------------------------------------------------------------
@@ -240,7 +214,7 @@ const CompareCompaniesOutputShape = {
 export function createServer() {
     const server = new McpServer({
         name: 'toolstem-mcp-server',
-        version: '1.1.0',
+        version: '1.2.2',
     });
     server.registerTool('get_stock_snapshot', {
         title: 'Stock Snapshot',
@@ -289,119 +263,8 @@ export function createServer() {
         };
     });
     // -------------------------------------------------------------------------
-    // Tool 3: screen_stocks
-    // -------------------------------------------------------------------------
-    const VALID_SECTORS = [
-        'Technology',
-        'Consumer Cyclical',
-        'Energy',
-        'Industrials',
-        'Financial Services',
-        'Basic Materials',
-        'Communication Services',
-        'Consumer Defensive',
-        'Healthcare',
-        'Real Estate',
-        'Utilities',
-    ];
-    const VALID_EXCHANGES = [
-        'NYSE',
-        'NASDAQ',
-        'AMEX',
-        'TSX',
-        'LSE',
-        'EURONEXT',
-        'XETRA',
-    ];
-    server.registerTool('screen_stocks', {
-        title: 'Stock Screener',
-        description: 'Screen and filter stocks by sector, market cap, price range, beta, volume, dividend yield, exchange, and country. Returns a curated list with derived signals — cap_category (MEGA/LARGE/MID/SMALL/MICRO/NANO), volatility_category (LOW/MODERATE/HIGH), and liquidity_category (HIGH/MODERATE/LOW). Use this to discover stocks matching specific investment criteria, build watchlists, or find opportunities within a sector.',
-        inputSchema: {
-            sector: z
-                .enum(VALID_SECTORS)
-                .optional()
-                .describe('Business sector to filter by'),
-            industry: z
-                .string()
-                .max(100)
-                .optional()
-                .describe('Specific industry (e.g., "Consumer Electronics", "Asset Management")'),
-            exchange: z
-                .enum(VALID_EXCHANGES)
-                .optional()
-                .describe('Stock exchange to filter by'),
-            country: z
-                .string()
-                .max(5)
-                .optional()
-                .describe('Country code (e.g., US, GB, DE, CA)'),
-            market_cap_min: z
-                .number()
-                .min(0)
-                .optional()
-                .describe('Minimum market cap in USD (e.g., 10000000000 for $10B)'),
-            market_cap_max: z
-                .number()
-                .min(0)
-                .optional()
-                .describe('Maximum market cap in USD'),
-            price_min: z
-                .number()
-                .min(0)
-                .optional()
-                .describe('Minimum stock price in USD'),
-            price_max: z
-                .number()
-                .min(0)
-                .optional()
-                .describe('Maximum stock price in USD'),
-            beta_min: z
-                .number()
-                .optional()
-                .describe('Minimum beta (e.g., 0.5 for lower-volatility stocks)'),
-            beta_max: z
-                .number()
-                .optional()
-                .describe('Maximum beta (e.g., 1.5 for moderate-volatility cap)'),
-            volume_min: z
-                .number()
-                .min(0)
-                .optional()
-                .describe('Minimum daily trading volume'),
-            dividend_min: z
-                .number()
-                .min(0)
-                .optional()
-                .describe('Minimum last annual dividend'),
-            is_etf: z
-                .boolean()
-                .optional()
-                .describe('Set true to include only ETFs, false to exclude ETFs. Omit to not filter by ETF status.'),
-            is_fund: z
-                .boolean()
-                .optional()
-                .describe('Set true to include only funds, false to exclude funds. Omit to not filter by fund status.'),
-            is_actively_trading: z
-                .boolean()
-                .default(true)
-                .describe('Only return actively trading securities. Defaults to true.'),
-            limit: z
-                .number()
-                .min(1)
-                .max(200)
-                .default(50)
-                .describe('Maximum results to return (1-200). Defaults to 50.'),
-        },
-        outputSchema: ScreenStocksOutputShape,
-    }, async (input) => {
-        const result = await screenStocks(input);
-        return {
-            content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-            structuredContent: result,
-        };
-    });
-    // -------------------------------------------------------------------------
-    // Tool 4: compare_companies
+    // Tool 3: compare_companies
+    // (screen_stocks removed in v1.2.2; returning in v1.3 — see header comment)
     // -------------------------------------------------------------------------
     server.registerTool('compare_companies', {
         title: 'Company Comparison',
@@ -464,7 +327,7 @@ async function runHttp() {
         }
     }, 60_000).unref();
     app.get('/health', (_req, res) => {
-        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.1.0' });
+        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.2' });
     });
     app.post('/mcp', async (req, res) => {
         try {

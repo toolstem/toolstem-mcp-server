@@ -186,80 +186,9 @@ Deep fundamentals analysis — profitability, financial health, cash flow, growt
 
 ---
 
-### `screen_stocks`
+### `screen_stocks` — temporarily disabled (returning in v1.3)
 
-Screen and filter US large/mid-cap stocks by sector, market cap, price, and volume. Returns derived category signals for every match.
-
-**Universe:** Russell 1000 (~1,000 US large/mid-cap stocks, ~93% of US equity market cap). Scope is always surfaced in `meta.universe`.
-
-**Supported filters (honored):** `sector`, `market_cap_min`, `market_cap_max`, `price_min`, `price_max`, `volume_min`, `limit`.
-
-**Unsupported on free tier (accepted but ignored, listed in `meta.unsupported_filters`):** `industry`, `beta_min`, `beta_max`, `dividend_min`, `exchange`, `country` (non-US). FMP's paid `/company-screener` endpoint is required for full filter coverage.
-
-**Sector values (case-insensitive):** Technology, Healthcare, Financial Services, Consumer Cyclical, Consumer Defensive, Industrials, Energy, Basic Materials, Real Estate, Communication Services, Utilities.
-
-**Input:**
-
-```json
-{
-  "sector": "Technology",
-  "market_cap_min": 10000000000,
-  "volume_min": 500000,
-  "limit": 20
-}
-```
-
-All parameters are optional — omit any filter to leave that dimension open.
-
-**Example output (truncated):**
-
-```json
-{
-  "query_summary": "20 stocks matching: sector=Technology, mktCap≥$10.0B, exchange=NASDAQ, volume≥500,000",
-  "total_results": 20,
-  "stocks": [
-    {
-      "symbol": "AAPL",
-      "company_name": "Apple Inc.",
-      "sector": "Technology",
-      "industry": "Consumer Electronics",
-      "exchange": "NASDAQ",
-      "country": "US",
-      "price": 178.52,
-      "market_cap": 2780000000000,
-      "market_cap_readable": "$2.78T",
-      "beta": 1.28,
-      "volume": 55000000,
-      "last_annual_dividend": 0.96,
-      "cap_category": "MEGA",
-      "volatility_category": "MODERATE",
-      "liquidity_category": "HIGH"
-    }
-  ],
-  "meta": {
-    "source": "Toolstem via Financial Modeling Prep",
-    "timestamp": "2026-04-20T18:30:00Z",
-    "data_delay": "Real-time during market hours",
-    "filters_applied": ["sector: Technology", "market_cap_min: 10000000000", "volume_min: 500000", "limit: 20"],
-    "universe": {
-      "name": "russell-1000",
-      "description": "Russell 1000 — top ~1,000 US companies by market cap (~93% of US equity market cap)",
-      "size": 1003,
-      "country": "US"
-    },
-    "notes": [
-      "Screening universe: Russell 1000 — top ~1,000 US companies by market cap (~93% of US equity market cap).",
-      "Supported filters: sector, market_cap_min/max, price_min/max, volume_min, limit. Results sorted by market cap descending."
-    ]
-  }
-}
-```
-
-**Derived fields:**
-
-- `cap_category` — `MEGA` (>$200B), `LARGE` ($10B–$200B), `MID` ($2B–$10B), `SMALL` ($300M–$2B), `MICRO` ($50M–$300M), `NANO` (<$50M).
-- `volatility_category` — `LOW` (beta < 0.8), `MODERATE` (0.8–1.3), `HIGH` (> 1.3).
-- `liquidity_category` — `HIGH` (volume > 1M), `MODERATE` (100K–1M), `LOW` (< 100K).
+`screen_stocks` is not exposed in v1.2.2. FMP's `/stable/batch-quote` endpoint, which powered the previous implementation, now requires a paid subscription (HTTP 402 on free tier). A refactored version built on the free-tier-available `/api/v3/stock-screener` endpoint will ship in v1.3 with better filter coverage (`industry`, `beta`, `dividend`, `country`) and 10× lower FMP quota usage.
 
 ---
 
@@ -373,17 +302,6 @@ or
 
 ```json
 {
-  "tool": "screen_stocks",
-  "sector": "Technology",
-  "market_cap_min": 10000000000,
-  "limit": 20
-}
-```
-
-or
-
-```json
-{
   "tool": "compare_companies",
   "symbols": ["AAPL", "MSFT", "GOOGL"]
 }
@@ -437,8 +355,10 @@ src/
 ├── tools/
 │   ├── get-stock-snapshot.ts
 │   ├── get-company-metrics.ts
-│   ├── screen-stocks.ts
+│   ├── screen-stocks.ts       # disabled in v1.2.2, returning in v1.3
 │   └── compare-companies.ts
+├── data/
+│   └── universe.ts   # Russell 1000 universe (for the v1.3 screener refactor)
 └── utils/
     └── formatting.ts # Market cap formatting, CAGR, trend signals
 ```
