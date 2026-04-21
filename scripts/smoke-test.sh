@@ -66,18 +66,22 @@ check_billing() {
   local label="$1"
   local run_json="$2"
 
+  sleep 5
+
   local status
   status=$(echo "$run_json" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-print(d.get('status',''))
+run = d.get('data', d)
+print(run.get('status',''))
 " 2>/dev/null || echo "")
 
   local tool_calls
   tool_calls=$(echo "$run_json" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-cc = d.get('chargedEventCounts', {}) or {}
+run = d.get('data', d)
+cc = run.get('chargedEventCounts', {}) or {}
 print(cc.get('tool-call', 0))
 " 2>/dev/null || echo "0")
 
