@@ -1,3 +1,16 @@
+import { Actor } from 'apify';
+
+import { getStockSnapshot } from './tools/get-stock-snapshot.js';
+import { getCompanyMetrics } from './tools/get-company-metrics.js';
+import { compareCompanies } from './tools/compare-companies.js';
+
+interface ActorInput {
+  tool: 'get_stock_snapshot' | 'get_company_metrics' | 'compare_companies';
+  symbol?: string;
+  period?: 'annual' | 'quarter';
+  symbols?: string[];
+}
+
 async function main(): Promise<void> {
   await Actor.init();
 
@@ -47,9 +60,12 @@ async function main(): Promise<void> {
 console.log('PPE charge result:', JSON.stringify(chargeResult));
 
   
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('Actor run failed:', err);
+  } main().catch(async (err) => {
+  // eslint-disable-next-line no-console
+  console.error('Unhandled error:', err);
+  try {
     await Actor.fail(err instanceof Error ? err.message : String(err));
+  } catch {
+    process.exit(1);
   }
-}
+});
