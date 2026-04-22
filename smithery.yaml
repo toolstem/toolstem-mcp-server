@@ -3,9 +3,13 @@
 # Remote MCP server hosted on Apify. The stdio/local path has been
 # removed intentionally — Toolstem Financial Data is distributed only
 # as a hosted service via Apify's pay-per-event billing.
+#
+# Token is passed as a query parameter because Apify's MCP gateway
+# accepts ?token=<APIFY_TOKEN> and Smithery's Bearer-header templating
+# was not being interpolated during scan.
 startCommand:
   type: http
-  url: https://mcp.apify.com/?tools=toolstem/toolstem-mcp-server
+  url: https://mcp.apify.com/?tools=toolstem/toolstem-mcp-server&token={{config.apifyToken}}
   configSchema:
     type: object
     required:
@@ -14,9 +18,7 @@ startCommand:
       apifyToken:
         type: string
         description: >-
-          Apify API token. Create one in Apify Console → Settings →
-          Integrations. Billing for Toolstem Financial Data runs through
-          your Apify account (pay-per-event).
+          Apify API token. Create one at
+          https://console.apify.com/account/integrations. Billing runs
+          through your Apify account (pay-per-event).
     additionalProperties: false
-  headers:
-    Authorization: "Bearer {{config.apifyToken}}"
