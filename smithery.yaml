@@ -1,14 +1,25 @@
-# Smithery configuration file: https://smithery.ai/docs/config
+# Smithery configuration for Toolstem Financial Intelligence MCP server.
+# Remote server hosted on Apify's MCP gateway; users bring their own Apify
+# token for authentication and Pay-Per-Event billing ($5 / 1,000 queries).
+# Reference: https://smithery.ai/docs/build/session-config
 startCommand:
-  type: stdio
+  type: http
+  url: https://mcp.apify.com/?tools=toolstem/toolstem-mcp-server
   configSchema:
     type: object
     required:
-      - fmpApiKey
+      - apifyToken
     properties:
-      fmpApiKey:
+      apifyToken:
         type: string
-        description: Financial Modeling Prep API key. Get one at https://financialmodelingprep.com
-    additionalProperties: false
-  commandFunction: |-
-    (config) => ({command: 'npx', args: ['-y', 'toolstem-mcp-server'], env: {FMP_API_KEY: config.fmpApiKey}})
+        format: password
+        title: Apify API Token
+        description: >-
+          Your personal Apify API token. Usage is billed to your Apify
+          account at $5 per 1,000 queries via Pay-Per-Event. Create a free
+          Apify account and grab a token at
+          https://console.apify.com/account/integrations
+        x-from:
+          header: apify-token
+        x-to:
+          query: token
