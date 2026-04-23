@@ -1,4 +1,4 @@
-# Toolstem MCP Server
+# 📊 Toolstem — Financial Intelligence MCP Server for AI Agents
 
 [![npm version](https://img.shields.io/npm/v/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-teal)](https://registry.modelcontextprotocol.io)
@@ -6,6 +6,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 **Agent-ready financial intelligence tools — curated, not raw.**
+
+
+Toolstem is a **stock market MCP server** and **financial data MCP** for **AI agents** — purpose-built for AI stock analysis, DCF valuation, and company comparison workflows. More finance MCP servers (SEC filings, insider transactions, institutional holdings) are on the way.
+
 
 Toolstem is an MCP (Model Context Protocol) server that turns raw financial market data into curated, synthesized intelligence for AI agents. Unlike passthrough wrappers that just expose a vendor's REST API, every Toolstem tool **combines multiple data sources**, **derives signals**, and **pre-computes the math** an agent would otherwise have to do itself.
 
