@@ -2,8 +2,9 @@
   "actorSpecification": 1,
   "name": "toolstem-mcp-server",
   "title": "Toolstem Financial Data",
-  "description": "Agent-ready financial intelligence MCP tools. Stock snapshots, deep company metrics, stock screening, and side-by-side company comparison \u2014 all with derived signals and pre-computed math. Designed for AI agents, not raw API passthrough.",
+  "description": "Agent-ready financial intelligence MCP tools. Stock snapshots, deep company metrics, stock screening, and side-by-side company comparison — all with derived signals and pre-computed math. Designed for AI agents, not raw API passthrough.",
   "version": "1.5",
+  "actorPermissionLevel": "LIMITED_PERMISSIONS",
   "input": "./input_schema.json",
   "dockerfile": "./Dockerfile",
   "dockerContextDir": ".."
