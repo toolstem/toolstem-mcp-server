@@ -1,0 +1,51 @@
+{
+  "$schema": "https://smithery.ai/schemas/server-card.json",
+  "name": "toolstem/toolstem-mcp-server",
+  "displayName": "Toolstem Financial Intelligence",
+  "description": "Agent-ready financial intelligence MCP tools — curated, not raw. Three tools that combine multiple data sources, derive human-readable signals (UNDERVALUED, STRONG, ACCELERATING), and pre-compute the math agents would otherwise have to do themselves.",
+  "version": "1.2.2",
+  "homepage": "https://github.com/toolstem/toolstem-mcp-server",
+  "repository": "https://github.com/toolstem/toolstem-mcp-server",
+  "license": "MIT",
+  "tools": [
+    {
+      "name": "get_stock_snapshot",
+      "description": "Real-time price, valuation, DCF analysis, and analyst ratings with derived signals (UNDERVALUED / FAIRLY_VALUED / OVERVALUED) for a single ticker.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["ticker"],
+        "properties": {
+          "ticker": { "type": "string", "description": "Stock ticker symbol, e.g. AAPL" }
+        }
+      }
+    },
+    {
+      "name": "get_company_metrics",
+      "description": "Profitability, financial health, cash flow, and 3-year CAGRs with derived signals (margin_trend, health_signal, growth_signal).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["ticker"],
+        "properties": {
+          "ticker": { "type": "string", "description": "Stock ticker symbol" }
+        }
+      }
+    },
+    {
+      "name": "compare_companies",
+      "description": "Side-by-side comparison of 2–5 companies with automatic rankings (lowest_pe, highest_margin, strongest_balance_sheet, best_growth, most_undervalued, highest_rated).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["tickers"],
+        "properties": {
+          "tickers": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": { "type": "string" },
+            "description": "Array of 2–5 stock tickers"
+          }
+        }
+      }
+    }
+  ]
+}
