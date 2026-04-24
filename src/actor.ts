@@ -58,6 +58,12 @@ async function main(): Promise<void> {
     const chargeResult = await Actor.charge({ eventName: 'tool-call' });
     // eslint-disable-next-line no-console
     console.log('PPE charge result:', JSON.stringify(chargeResult));
+
+    // Explicitly terminate the Actor run. Without this, the container keeps
+    // running until the per-run timeout (120s default) even though the tool
+    // has already returned, causing smoke tests and downstream orchestration
+    // to see runs as TIMED-OUT.
+    await Actor.exit();
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('Actor run failed:', err);

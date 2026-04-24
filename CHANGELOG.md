@@ -5,6 +5,12 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-04-24
+
+### Fixed
+
+- **Critical:** Actor runs no longer hang until the 120-second container timeout. Restored the `await Actor.exit()` call at the end of the Actor entrypoint, which is required by the Apify SDK v3 when `Actor.init()` has been called (init opens a WebSocket that must be explicitly closed). Without this, every run completed its tool work successfully but the container stayed alive until timeout, causing downstream orchestration (including the pre-publish smoke test) to see runs as `TIMED-OUT`. Regression introduced in commit `fb7d35c` (2026-04-21); detected by the pre-publish smoke test on 2026-04-24.
+
 ## [1.2.4] - 2026-04-24
 
 ### Fixed
