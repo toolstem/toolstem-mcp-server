@@ -6,6 +6,7 @@
  */
 
 import { FmpClient, type FmpQuote } from '../services/fmp.js';
+import { withBatchFallback } from '../services/fallback.js';
 import { formatMarketCap, round1, round2, safeNumber } from '../utils/formatting.js';
 
 // ---------------------------------------------------------------------------
@@ -323,9 +324,33 @@ export async function compareCompanies(
   const fmp = client ?? new FmpClient();
   const normalized = symbols.map((s) => s.trim().toUpperCase());
 
-  // 1. Batch quote — single API call for all symbols
-  const quotes = await fmp.getBatchQuote(normalized).catch(() => [] as FmpQuote[]);
-  let totalApiCalls = 1;
+  // 1. Batch quote with per-symbol fallback on 402/empty.
+  // FMP moved /stable/batch-quote behind a paywall on free tier; withBatchFallback
+  // degrades gracefully to per-symbol getQuote calls so the comparison still
+  // returns a complete response instead of failing the whole tool.
+  const { results: quotes, diag: quoteDiag } = await withBatchFallback<string, FmpQuote>(
+    normalized,
+    async (syms) => {
+      try {
+        return await fmp.getBatchQuote(syms);
+      } catch {
+        return null;
+      }
+    },
+    async (sym) => {
+      try {
+        return await fmp.getQuote(sym);
+      } catch {
+        return null;
+      }
+    },
+    { concurrency: 5 },
+  );
+  // When fallback fires, the initial (failed) batch call still consumed a
+  // network round-trip, so count it alongside the per-item attempts.
+  let totalApiCalls = quoteDiag.usedFallback
+    ? 1 + (quoteDiag.perItemCount ?? normalized.length)
+    : 1;
 
   // Map quotes by symbol for fast lookup
   const quoteMap = new Map<string, FmpQuote>();

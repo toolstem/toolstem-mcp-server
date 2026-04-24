@@ -5,6 +5,25 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-04-24
+
+### Fixed
+
+- `compare_companies`: graceful degradation when FMP's `/stable/batch-quote` endpoint returns 402 on the free tier. The tool now falls back to per-symbol `getQuote` calls via the new `withBatchFallback` helper, so a 2–5 symbol comparison completes with a full response instead of failing the whole call.
+
+### Internal
+
+- Introduced reusable `withBatchFallback` helper in `src/services/fallback.ts` for batch → per-item degradation with bounded concurrency. Reserved for reuse by future tools that depend on batch endpoints (SEC Form 4 batches, 13F batch holdings in the upcoming SEC server).
+- `api_calls_made` in the `compare_companies` response now reflects the true network round-trip count in both the batch-succeeded and fallback paths.
+
+## [1.2.3] - 2026-04-23
+
+### Changed
+
+- README H1 and front-matter updated to keyword-forward financial intelligence positioning for MCP directory discoverability.
+- `actor.json` declares `LIMITED_PERMISSIONS` explicitly.
+- Added `server-card.json` for MCP registry distribution.
+
 ## [1.2.2] - 2026-04-21
 
 ### Removed — `screen_stocks` tool temporarily disabled
