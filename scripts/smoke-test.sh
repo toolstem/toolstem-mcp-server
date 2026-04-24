@@ -16,8 +16,12 @@ set -euo pipefail
 ACTOR="${ACTOR:-toolstem~toolstem-mcp-server}"
 TIMEOUT="${TIMEOUT:-120}"
 
-DATA_BASE="https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?token=${APIFY_TOKEN}&timeout=${TIMEOUT}"
-RUN_BASE="https://api.apify.com/v2/acts/${ACTOR}/runs"
+# Pass the Apify token via Authorization header, never in the URL query
+# string. URL-embedded tokens can leak into curl verbose output, error
+# messages, and third-party log aggregators (especially in CI).
+APIFY_AUTH_HEADER="Authorization: Bearer ${APIFY_TOKEN}"
+DATA_URL="https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?timeout=${TIMEOUT}"
+RUN_URL="https://api.apify.com/v2/acts/${ACTOR}/runs?waitForFinish=${TIMEOUT}"
 
 PASS=0
 FAIL=0
@@ -28,14 +32,18 @@ call_tool() {
   local name="$1"
   local payload="$2"
   local response
-  response=$(curl -sS -X POST "$DATA_BASE" -H "Content-Type: application/json" -d "$payload" 2>&1)
+  response=$(curl -sS -X POST "$DATA_URL" \
+    -H "$APIFY_AUTH_HEADER" \
+    -H "Content-Type: application/json" \
+    -d "$payload" 2>&1)
   echo "$response"
 }
 
 run_and_get_run_json() {
   local payload="$1"
   local run_response
-  run_response=$(curl -sS -X POST "${RUN_BASE}?token=${APIFY_TOKEN}&waitForFinish=${TIMEOUT}" \
+  run_response=$(curl -sS -X POST "$RUN_URL" \
+    -H "$APIFY_AUTH_HEADER" \
     -H "Content-Type: application/json" \
     -d "$payload")
   echo "$run_response"
@@ -60,40 +68,6 @@ warn() {
   local detail="$2"
   printf "  \033[33mWARN\033[0m  %s  %s\n" "$label" "$detail"
   WARN=$((WARN+1))
-}
-
-check_billing() {
-  local label="$1"
-  local run_json="$2"
-
-  sleep 5
-
-  local status
-  status=$(echo "$run_json" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-run = d.get('data', d)
-print(run.get('status',''))
-" 2>/dev/null || echo "")
-
-  local tool_calls
-  tool_calls=$(echo "$run_json" | python3 -c "
-import json, sys
-d = json.load(sys.stdin)
-run = d.get('data', d)
-cc = run.get('chargedEventCounts', {}) or {}
-print(cc.get('tool-call', 0))
-" 2>/dev/null || echo "0")
-
-  if [ "$status" != "SUCCEEDED" ]; then
-    check "$label status=SUCCEEDED" 0 "status=$status"
-  else
-    if [ "$tool_calls" = "1" ]; then
-      check "$label chargedEventCounts.tool-call==1" 1
-    else
-      check "$label chargedEventCounts.tool-call==1" 0 "got $tool_calls"
-    fi
-  fi
 }
 
 echo "=========================================="

@@ -1,0 +1,71 @@
+name: Live Apify smoke test
+
+# Catches runtime regressions that only surface against the live Apify Actor
+# (e.g. the Actor.exit() hang in fb7d35c that TypeScript and unit tests
+# couldn't see). Runs on every push to main and once daily as a canary.
+#
+# Cost note: Every run executes real tool calls on the live Actor and fires
+# PPE `tool-call` events. Owner-token runs are currently exempt from PPE
+# charges by Apify policy, but that is a runtime guarantee — if the token
+# is ever rotated to a non-owner token, every CI run becomes a paid event.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/smoke-test.sh'
+      - 'package.json'
+      - '.github/workflows/smoke.yml'
+  workflow_dispatch: # allow manual runs
+  schedule:
+    - cron: '0 13 * * *' # daily canary at 13:00 UTC (~08:00 CDT)
+
+concurrency:
+  # Cancel any older in-flight smoke for this ref when a new push arrives.
+  # Push and schedule use different group suffixes so they don't cancel
+  # each other.
+  group: smoke-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  ACTOR: toolstem~toolstem-mcp-server
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    # Worst case: 180s sleep + 6 tool calls × 120s = 900s. Add headroom
+    # for network, Apify scheduling, and diagnostics.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for Apify build to promote latest
+        if: github.event_name == 'push'
+        # Apify git-based builds take ~1–3 min after push. Sleep briefly so
+        # the smoke test hits the new build, not the previous one. Heuristic,
+        # not a guarantee — acceptable because a stale-build false-pass would
+        # be caught by the next push's smoke or the daily canary.
+        run: sleep 180
+
+      - name: Run smoke test
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          TIMEOUT: 120
+        run: bash scripts/smoke-test.sh
+
+      - name: Post-failure diagnostics
+        if: failure()
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          echo "=== Recent actor runs (for triage) ==="
+          curl -sS \
+            -H "Authorization: Bearer ${APIFY_TOKEN}" \
+            "https://api.apify.com/v2/acts/${ACTOR}/runs?limit=5&desc=true" \
+            | jq '.data.items | map({id, status, startedAt, finishedAt, buildNumber})' \
+            || echo "(failed to fetch run list)"
