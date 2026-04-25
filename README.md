@@ -1,17 +1,17 @@
-# 📊 Toolstem — Financial Intelligence MCP Server for AI Agents
+# 📊 Toolstem — Financial Data MCP for AI Agents | Stock Analysis & DCF
 
 [![npm version](https://img.shields.io/npm/v/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-teal)](https://registry.modelcontextprotocol.io)
 [![Apify Store](https://img.shields.io/badge/Apify_Store-$0.005%2Fcall-blue)](https://apify.com/toolstem/toolstem-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
-**Agent-ready financial intelligence tools — curated, not raw.**
+**Curated financial data MCP for AI agents — equity research in one call.**
 
+Toolstem is the **financial data MCP** built for AI stock analysis, equity research, and agent-driven investment workflows. Real-time stock data, company fundamentals, DCF valuations, financial metrics, and the ability to compare companies side-by-side — all returned as flat, agent-friendly JSON with derived signals already computed.
 
-Toolstem is a **stock market MCP server** and **financial data MCP** for **AI agents** — purpose-built for AI stock analysis, DCF valuation, and company comparison workflows. More finance MCP servers (SEC filings, insider transactions, institutional holdings) are on the way.
+Works natively with **Claude**, **OpenAI Agents SDK**, and **LangChain**. Pay-per-call pricing, no subscription. More finance MCP servers (SEC filings, insider transactions, institutional holdings) are on the way.
 
-
-Toolstem is an MCP (Model Context Protocol) server that turns raw financial market data into curated, synthesized intelligence for AI agents. Unlike passthrough wrappers that just expose a vendor's REST API, every Toolstem tool **combines multiple data sources**, **derives signals**, and **pre-computes the math** an agent would otherwise have to do itself.
+Unlike passthrough wrappers that just expose a vendor's REST API, every Toolstem tool **combines multiple data sources**, **derives signals**, and **pre-computes the math** an agent would otherwise have to do itself.
 
 One call. One agent-friendly JSON response. No nested arrays to parse, no cross-endpoint stitching, no null-checking boilerplate.
 
