@@ -5,6 +5,17 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.6] - 2026-04-27
+
+### Changed
+
+- **Default demonstration on empty input.** When the actor is invoked with no input (or with input missing the `tool` field), it now runs `get_stock_snapshot('AAPL')` as a default demonstration instead of exiting with an error. This addresses a real conversion leak observed in production: directory health-check probes and first-time evaluators frequently invoke actors with empty input to verify reachability, and the previous behavior (silent exit, no output) made the actor look broken or empty in those probes. The new behavior produces a real, useful result so directory listings and exploratory runs see what the actor actually does. MCP gateway invocations are unaffected — they always pass `tool` explicitly.
+
+### Added
+
+- **Default-demo response cache** (KV store, 6h TTL) so high probe volume does not multiply FMP API consumption (the FMP free tier is 250 calls/day). First default-demo run hits FMP; subsequent probes within 6h are served from cache.
+- **No-charge policy for default-demo runs.** Default demonstrations skip the `tool-call` PPE charge. Probes don't generate revenue, and we shouldn't bill health-check accounts for runs they didn't intend. Real invocations (input with `tool` specified) charge as before.
+
 ## [1.2.5] - 2026-04-24
 
 ### Fixed

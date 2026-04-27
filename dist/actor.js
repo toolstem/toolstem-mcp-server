@@ -5,12 +5,46 @@ import { compareCompanies } from './tools/compare-companies.js';
 async function main() {
     await Actor.init();
     try {
-        const input = await Actor.getInput();
-        if (!input)
-            throw new Error('Input is missing!');
-        if (!input.tool)
-            throw new Error('Input field "tool" is required.');
+        const rawInput = await Actor.getInput();
+        // Default behavior: when no input or no tool is provided (e.g. directory
+        // health-check probes, first-time evaluators clicking "Run" with empty
+        // fields), demonstrate the most common tool with a well-known ticker so
+        // the run produces a useful result instead of an empty exit.
+        //
+        // Default-demo runs are NOT charged the per-call PPE event — health-check
+        // probes shouldn't generate revenue and shouldn't drain the FMP daily
+        // quota. The result is also cached in the actor's default key-value
+        // store under DEMO_CACHE_KEY for DEMO_CACHE_TTL_MS, so a high probe rate
+        // does not multiply FMP API consumption.
+        const isDefaultDemo = !rawInput || !rawInput.tool;
+        const input = {
+            tool: rawInput?.tool ?? 'get_stock_snapshot',
+            symbol: rawInput?.symbol ?? 'AAPL',
+            period: rawInput?.period,
+            symbols: rawInput?.symbols,
+        };
+        if (isDefaultDemo) {
+            // eslint-disable-next-line no-console
+            console.log(`No tool specified — running default demonstration: ${input.tool}(${input.symbol}). ` +
+                `For real usage, specify { "tool": "...", "symbol": "..." } or use the MCP gateway at https://mcp.apify.com/?tools=toolstem/toolstem-mcp-server`);
+        }
+        // Default-demo cache: if a recent default demo result is in the KV
+        // store, serve it instead of calling FMP again. Real (non-default)
+        // invocations always go to FMP.
+        const DEMO_CACHE_KEY = 'DEFAULT_DEMO_RESULT_V1';
+        const DEMO_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
         let result;
+        if (isDefaultDemo) {
+            const cached = (await Actor.getValue(DEMO_CACHE_KEY));
+            if (cached && typeof cached.at === 'number' && Date.now() - cached.at < DEMO_CACHE_TTL_MS) {
+                // eslint-disable-next-line no-console
+                console.log(`Serving default demonstration from cache (age: ${Math.round((Date.now() - cached.at) / 1000)}s).`);
+                result = cached.result;
+                await Actor.pushData(result);
+                await Actor.exit();
+                return;
+            }
+        }
         switch (input.tool) {
             case 'get_stock_snapshot': {
                 if (!input.symbol || typeof input.symbol !== 'string') {
@@ -38,9 +72,18 @@ async function main() {
                 throw new Error(`Unknown tool: ${input.tool}. Valid tools: get_stock_snapshot, get_company_metrics, compare_companies.`);
         }
         await Actor.pushData(result);
-        const chargeResult = await Actor.charge({ eventName: 'tool-call' });
-        // eslint-disable-next-line no-console
-        console.log('PPE charge result:', JSON.stringify(chargeResult));
+        if (isDefaultDemo) {
+            // Cache the demo result so subsequent probes are served from cache,
+            // not by calling FMP again.
+            await Actor.setValue(DEMO_CACHE_KEY, { at: Date.now(), result });
+            // eslint-disable-next-line no-console
+            console.log('Default demonstration result cached for 6h. PPE charge skipped (probe).');
+        }
+        else {
+            const chargeResult = await Actor.charge({ eventName: 'tool-call' });
+            // eslint-disable-next-line no-console
+            console.log('PPE charge result:', JSON.stringify(chargeResult));
+        }
         // Explicitly terminate the Actor run. Without this, the container keeps
         // running until the per-run timeout (120s default) even though the tool
         // has already returned, causing smoke tests and downstream orchestration

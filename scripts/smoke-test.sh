@@ -154,7 +154,14 @@ echo "[6/6] compare_companies (AAPL, MSFT) – billing"
 RUN_JSON=$(run_and_get_run_json '{"tool":"compare_companies","symbols":["AAPL","MSFT"]}')
 warn "compare_companies billing" "skipped: owner runs are not charged by Apify"
 
-# --- Test 4: screen_stocks should be REJECTED (removed in v1.2.2) ---
+# --- Test 4: empty input should run default demonstration ---
+echo ""
+echo "[extra] empty input — should run default demonstration (get_stock_snapshot AAPL)"
+RESP=$(call_tool "empty_input_default_demo" '{}')
+DEMO_SYMBOL=$(echo "$RESP" | python3 -c "import json,sys; d=json.load(sys.stdin); print((d[0] if isinstance(d,list) and d else {}).get('symbol',''))" 2>/dev/null || echo "")
+[ "$DEMO_SYMBOL" = "AAPL" ] && check "empty input → default demo returns AAPL" 1 || check "empty input → default demo returns AAPL" 0 "got '$DEMO_SYMBOL'"
+
+# --- Test 5: screen_stocks should be REJECTED (removed in v1.2.2) ---
 echo ""
 echo "[extra] screen_stocks (should be rejected — removed in v1.2.2)"
 RESP=$(call_tool "screen_stocks" '{"tool":"screen_stocks","sector":"Technology"}')

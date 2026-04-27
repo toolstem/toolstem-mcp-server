@@ -7,7 +7,7 @@
     "tool": {
       "title": "Tool",
       "type": "string",
-      "description": "Which tool to run",
+      "description": "Which tool to run. If omitted, the actor runs a default demonstration (get_stock_snapshot for AAPL) so first-time evaluators see real output. Real usage should always specify a tool.",
       "enum": ["get_stock_snapshot", "get_company_metrics", "compare_companies"],
       "default": "get_stock_snapshot",
       "editor": "select"
@@ -35,5 +35,5 @@
       "items": { "type": "string" }
     }
   },
-  "required": ["tool"]
+  "required": []
 }
