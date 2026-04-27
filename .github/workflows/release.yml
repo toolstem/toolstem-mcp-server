@@ -1,0 +1,132 @@
+name: Release to npm
+
+# Publishes the package to npm when a `vX.Y.Z` tag is pushed.
+#
+# Flow:
+#   1. Tag must match package.json version exactly (catches the "forgot to bump" foot-gun).
+#   2. Build + smoke test against the live Apify Actor — no broken release ships.
+#   3. `npm publish` with provenance (SLSA attestation linking the tarball to this commit).
+#
+# To ship a new version:
+#   1. Bump version in package.json, commit, push to main
+#   2. `git tag vX.Y.Z && git push --tags`
+#   3. This workflow handles the rest
+#
+# Required secrets:
+#   - NPM_TOKEN: npm automation token (read+publish) for the `toolstem` user
+#   - APIFY_TOKEN: already used by smoke.yml
+
+on:
+  push:
+    tags:
+      # Strict semver only. Loose globs (v1, v1.2-beta) would still be
+      # caught by the package.json version check below, but only after
+      # the 180s Apify build wait + full smoke test — better to reject early.
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v1.2.6). Must already exist on the repo.'
+        required: true
+
+concurrency:
+  # For tag pushes, github.ref is the tag itself. For workflow_dispatch,
+  # github.ref is the branch — fold in the input so dispatches for
+  # different tags don't share a queue.
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  ACTOR: toolstem~toolstem-mcp-server
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
+
+    steps:
+      - name: Checkout (tag)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 1
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag matches package.json version
+        env:
+          # Route the dispatch input through env, never interpolate it
+          # directly into the shell — prevents command injection via the
+          # workflow_dispatch tag input.
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG_NAME="${TAG_INPUT:-$GITHUB_REF_NAME}"
+          TAG_VERSION="${TAG_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "Tag version:     $TAG_VERSION"
+          echo "Package version: $PKG_VERSION"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION). Refusing to publish."
+            exit 1
+          fi
+
+      - name: Install dependencies (clean)
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Wait for Apify build to promote latest
+        # Tag pushes typically arrive seconds after the main commit. Apify
+        # git-based builds take ~1–3 min. Sleep so smoke hits the new build.
+        run: |
+          echo "Sleeping 180s to let Apify finish building latest..."
+          sleep 180
+
+      - name: Smoke test against live Apify Actor
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash scripts/smoke-test.sh
+          echo "Smoke test passed. Proceeding to publish."
+
+      - name: Publish to npm (with provenance)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: Verify published version
+        env:
+          # Defense-in-depth: setup-node wrote ~/.npmrc with NODE_AUTH_TOKEN
+          # interpolation. Blank it here so any future npm CLI quirk that
+          # logs the resolved auth header on error can't leak the publish
+          # token via the verify step.
+          NODE_AUTH_TOKEN: ""
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG_NAME="${TAG_INPUT:-$GITHUB_REF_NAME}"
+          EXPECTED="${TAG_NAME#v}"
+          # Query the specific version directly — not the `latest` dist-tag.
+          # `latest` can race or not have propagated; existence of the exact
+          # version is the real success signal.
+          for i in 1 2 3 4 5; do
+            PUBLISHED=$(npm view "toolstem-mcp-server@${EXPECTED}" version 2>/dev/null || echo "")
+            echo "Attempt $i: registry shows '$PUBLISHED' for version $EXPECTED"
+            if [ "$PUBLISHED" = "$EXPECTED" ]; then
+              echo "::notice::Published toolstem-mcp-server@$EXPECTED"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Published version did not converge to $EXPECTED within 50s"
+          exit 1
