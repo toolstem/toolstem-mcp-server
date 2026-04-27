@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-16/server.schema.json",
   "name": "io.github.toolstem/toolstem-mcp-server",
-  "description": "Agent-ready financial intelligence MCP tools with derived signals.",
+  "description": "Financial intelligence MCP for AI agents — DCF, ratios, comparisons. Pre-computed signals.",
   "repository": {
     "url": "https://github.com/toolstem/toolstem-mcp-server",
     "source": "github"
   },
-  "version": "1.2.2",
+  "version": "1.2.6",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "toolstem-mcp-server",
-      "version": "1.2.2",
+      "version": "1.2.6",
       "transport": {
         "type": "stdio"
       },

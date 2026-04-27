@@ -1,0 +1,110 @@
+name: Publish to MCP Registry
+
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["Release to npm"]
+    types: [completed]
+
+permissions:
+  id-token: write   # Required for github-oidc auth to mcp-publisher
+  contents: read
+
+concurrency:
+  group: mcp-registry-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Pinned mcp-publisher release — update intentionally, never floating.
+  MCP_PUBLISHER_VERSION: v1.7.2
+  # SHA-256 of mcp-publisher_linux_amd64.tar.gz from registry_1.7.2_checksums.txt
+  MCP_PUBLISHER_LINUX_AMD64_SHA256: 9a324bab0bc69bf957599d7975b663d7c4169eba2cdc00baf0f589b847e03898
+
+jobs:
+  publish:
+    # Run on manual dispatch, OR after a successful Release run
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify server.json package version matches package.json
+        run: |
+          PKG_VER=$(node -p "require('./package.json').version")
+          SRV_VER=$(node -p "require('./server.json').version")
+          SRV_PKG_VER=$(node -p "require('./server.json').packages[0].version")
+          echo "package.json version: $PKG_VER"
+          echo "server.json version: $SRV_VER"
+          echo "server.json packages[0].version: $SRV_PKG_VER"
+          if [ "$PKG_VER" != "$SRV_VER" ] || [ "$PKG_VER" != "$SRV_PKG_VER" ]; then
+            echo "::error::version mismatch — package.json=$PKG_VER server.json=$SRV_VER server.json.packages[0]=$SRV_PKG_VER"
+            exit 1
+          fi
+
+      - name: Wait for npm to propagate the version
+        run: |
+          PKG_VER=$(node -p "require('./package.json').version")
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            PUBLISHED=$(npm view toolstem-mcp-server@"$PKG_VER" version 2>/dev/null || true)
+            if [ "$PUBLISHED" = "$PKG_VER" ]; then
+              echo "npm has $PKG_VER"
+              exit 0
+            fi
+            echo "Attempt $i: npm shows '$PUBLISHED' for $PKG_VER, retrying in 12s"
+            sleep 12
+          done
+          echo "::error::npm did not show version $PKG_VER after 2 minutes"
+          exit 1
+
+      - name: Install mcp-publisher (pinned + checksum-verified)
+        run: |
+          set -euo pipefail
+          # Runner is ubuntu-latest x64; we explicitly target linux_amd64 so the
+          # SHA pin is unambiguous. If the runner image ever changes, this fails fast.
+          if [ "$(uname -s)" != "Linux" ] || [ "$(uname -m)" != "x86_64" ]; then
+            echo "::error::This workflow assumes a linux_amd64 runner; got $(uname -s)/$(uname -m)"
+            exit 1
+          fi
+          ASSET="mcp-publisher_linux_amd64.tar.gz"
+          URL="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${ASSET}"
+          curl -fsSL -o "$ASSET" "$URL"
+          echo "${MCP_PUBLISHER_LINUX_AMD64_SHA256}  ${ASSET}" | sha256sum -c -
+          tar xz -f "$ASSET" mcp-publisher
+          rm -f "$ASSET"
+          chmod +x mcp-publisher
+          ./mcp-publisher --help | head -1
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json to MCP Registry
+        run: ./mcp-publisher publish
+
+      - name: Verify the new version is live
+        run: |
+          set -euo pipefail
+          PKG_VER=$(node -p "require('./package.json').version")
+          for i in 1 2 3 4 5 6 7 8; do
+            FOUND=$(curl -fsSL "https://registry.modelcontextprotocol.io/v0/servers?search=toolstem" \
+              | node -e "
+                let d=''; process.stdin.on('data',c=>d+=c); process.stdin.on('end',()=>{
+                  const j=JSON.parse(d);
+                  const match=(j.servers||[]).find(s =>
+                    s.server && s.server.version === process.argv[1] &&
+                    (s._meta && s._meta['io.modelcontextprotocol.registry/official'] || {}).isLatest === true
+                  );
+                  process.stdout.write(match ? 'yes' : 'no');
+                });
+              " "$PKG_VER")
+            if [ "$FOUND" = "yes" ]; then
+              echo "Registry shows v$PKG_VER as isLatest=true"
+              exit 0
+            fi
+            echo "Attempt $i: registry not yet showing v$PKG_VER as latest, retrying in 12s"
+            sleep 12
+          done
+          echo "::error::registry did not report v$PKG_VER as the latest version"
+          exit 1
