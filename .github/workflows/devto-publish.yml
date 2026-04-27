@@ -1,0 +1,42 @@
+name: Dev.to publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish (true) or save as draft (false)"
+        required: true
+        type: choice
+        default: "true"
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate publish input
+        env:
+          PUBLISH_INPUT: ${{ inputs.publish }}
+        run: |
+          case "$PUBLISH_INPUT" in
+            true|false) : ;;
+            *) echo "Invalid publish input" >&2; exit 1 ;;
+          esac
+
+      - name: Publish to Dev.to
+        env:
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          DEVTO_PUBLISH: ${{ inputs.publish }}
+        run: node .github/scripts/publish_devto.mjs
