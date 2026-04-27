@@ -56,17 +56,31 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 1
 
-      - name: Setup Node 22
-        # Node 22 ships npm 10.x; we upgrade npm to >=11.5 below for
-        # OIDC Trusted Publisher support.
+      - name: Setup Node 24 (ships npm 11.x natively)
+        # Trusted Publishers requires Node ≥ 22.14 and npm ≥ 11.5.1.
+        # Node 24 LTS bundles npm 11.x by default, so no in-place
+        # upgrade is required. Earlier attempt with `npm install -g npm@latest`
+        # on Node 22 failed mid-upgrade with MODULE_NOT_FOUND for
+        # promise-retry — the bundled npm corrupts its own dep graph
+        # while replacing itself.
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Upgrade npm to OIDC-capable version
-        # Trusted Publishers OIDC support landed in npm 11.5.1.
-        run: npm install -g npm@latest
+      - name: Verify npm OIDC capability
+        run: |
+          set -euo pipefail
+          NPM_VERSION=$(npm --version)
+          echo "node: $(node --version)"
+          echo "npm:  $NPM_VERSION"
+          # Trusted Publishers requires npm >= 11.5.1. Node 24 LTS ships
+          # npm 11.x; this guard catches future runner-image regressions.
+          MIN="11.5.1"
+          if [ "$(printf '%s\n' "$MIN" "$NPM_VERSION" | sort -V | head -n1)" != "$MIN" ]; then
+            echo "::error::npm $NPM_VERSION is below required $MIN for OIDC Trusted Publishers"
+            exit 1
+          fi
 
       - name: Verify tag matches package.json version
         env:
