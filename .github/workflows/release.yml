@@ -12,9 +12,11 @@ name: Release to npm
 #   2. `git tag vX.Y.Z && git push --tags`
 #   3. This workflow handles the rest
 #
-# Required secrets:
-#   - NPM_TOKEN: npm automation token (read+publish) for the `toolstem` user
-#   - APIFY_TOKEN: already used by smoke.yml
+# Authentication:
+#   - npm: OIDC via Trusted Publishers (configured on the npm package).
+#     No long-lived token — the runner mints a short-lived credential at
+#     publish time. Requires `id-token: write` permission and npm CLI ≥ 11.5.
+#   - Apify: APIFY_TOKEN secret (already present, also used by smoke.yml).
 
 on:
   push:
@@ -54,11 +56,17 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 1
 
-      - name: Setup Node 20
+      - name: Setup Node 22
+        # Node 22 ships npm 10.x; we upgrade npm to >=11.5 below for
+        # OIDC Trusted Publisher support.
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to OIDC-capable version
+        # Trusted Publishers OIDC support landed in npm 11.5.1.
+        run: npm install -g npm@latest
 
       - name: Verify tag matches package.json version
         env:
@@ -99,18 +107,15 @@ jobs:
           bash scripts/smoke-test.sh
           echo "Smoke test passed. Proceeding to publish."
 
-      - name: Publish to npm (with provenance)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish to npm (OIDC + provenance)
+        # No NODE_AUTH_TOKEN — npm CLI uses the GitHub OIDC id-token to
+        # exchange for a short-lived publish credential, scoped to this
+        # exact workflow run. Requires Trusted Publisher to be configured
+        # on npmjs.com for this package + repo + workflow file.
         run: npm publish --provenance --access public
 
       - name: Verify published version
         env:
-          # Defense-in-depth: setup-node wrote ~/.npmrc with NODE_AUTH_TOKEN
-          # interpolation. Blank it here so any future npm CLI quirk that
-          # logs the resolved auth header on error can't leak the publish
-          # token via the verify step.
-          NODE_AUTH_TOKEN: ""
           TAG_INPUT: ${{ github.event.inputs.tag }}
         run: |
           set -euo pipefail
