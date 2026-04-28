@@ -5,6 +5,12 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.8] - 2026-04-28
+
+### Changed
+
+- **README — final scrub of `screen_stocks` references.** Removed leftover mentions in the Architecture directory-tree and the unused `data/universe.ts` line that referenced a v1.3 screener refactor. README now describes only what is shipped today.
+
 ## [1.2.7] - 2026-04-28
 
 ### Changed

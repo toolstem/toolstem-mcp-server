@@ -379,10 +379,7 @@ src/
 ├── tools/
 │   ├── get-stock-snapshot.ts
 │   ├── get-company-metrics.ts
-│   ├── screen-stocks.ts       # disabled in v1.2.2, returning in v1.3
 │   └── compare-companies.ts
-├── data/
-│   └── universe.ts   # Russell 1000 universe (for the v1.3 screener refactor)
 └── utils/
     └── formatting.ts # Market cap formatting, CAGR, trend signals
 ```
