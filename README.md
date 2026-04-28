@@ -17,6 +17,32 @@ One call. One agent-friendly JSON response. No nested arrays to parse, no cross-
 
 ---
 
+## Try It Now (30 seconds)
+
+**Apify Console** — click **Run** with default input. AAPL stock snapshot returns in ~3 seconds, no charge:
+
+> https://apify.com/toolstem/toolstem-mcp-server
+
+**Claude Desktop** — drop into your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "toolstem": {
+      "command": "npx",
+      "args": ["-y", "toolstem-mcp-server"],
+      "env": { "FMP_API_KEY": "your-key-from-financialmodelingprep.com" }
+    }
+  }
+}
+```
+
+Restart Claude. Ask: *"Use Toolstem to get a snapshot of NVDA."*
+
+**npm** — `npx toolstem-mcp-server` runs the server locally over stdio.
+
+---
+
 ## Why Toolstem?
 
 Most financial MCP servers expose one tool per API endpoint — forcing your agent to make 4–5 sequential calls, write glue code, and reason about raw data shapes. Toolstem is built differently:
@@ -187,12 +213,6 @@ Deep fundamentals analysis — profitability, financial health, cash flow, growt
 - `growth_signal` — `ACCELERATING`, `STEADY`, or `DECELERATING` based on YoY growth trajectory.
 - `revenue_cagr`, `net_income_cagr`, `fcf_cagr` — compound annual growth rates over the analyzed window.
 - `fcf_margin`, `fcf_yield` — pre-computed from cash flow + revenue + market cap.
-
----
-
-### `screen_stocks` — temporarily disabled (returning in v1.3)
-
-`screen_stocks` is not exposed in v1.2.2. FMP's `/stable/batch-quote` endpoint, which powered the previous implementation, now requires a paid subscription (HTTP 402 on free tier). A refactored version built on the free-tier-available `/api/v3/stock-screener` endpoint will ship in v1.3 with better filter coverage (`industry`, `beta`, `dividend`, `country`) and 10× lower FMP quota usage.
 
 ---
 

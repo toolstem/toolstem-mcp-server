@@ -5,6 +5,18 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.7] - 2026-04-28
+
+### Changed
+
+- **Apify Store listing copy refresh.** Updated `.actor/input_schema.json` and `.actor/actor.json` descriptions to front-load "Financial data MCP server for AI agents" and remove references to a tool not currently exposed. Aligns listing copy with the v1.2.6 product surface and matches search-intent keywords on Apify Store.
+- **README — added "Try It Now (30 seconds)" Quick Start.** Three concrete entry paths (Apify Console, Claude Desktop, npm) above the fold to shorten time-to-first-call for evaluators.
+- **README — removed stale `screen_stocks — temporarily disabled` section.** The roadmap line in the hero already signals continued investment in finance tools; the apologetic mid-README block was suppressing perceived recency.
+
+### Fixed
+
+- None (listing-copy + docs only; zero runtime behavior change).
+
 ## [1.2.6] - 2026-04-27
 
 ### Changed

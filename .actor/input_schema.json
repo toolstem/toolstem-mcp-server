@@ -1,6 +1,6 @@
 {
   "title": "Toolstem Financial Data",
-  "description": "Curated financial intelligence for AI agents — 3 tools: stock snapshot, company metrics, company comparison. (screen_stocks is temporarily disabled in v1.2.2 and will return in v1.3.)",
+  "description": "Curated financial data MCP for AI agents — 3 tools: stock snapshot, deep company metrics, side-by-side company comparison. Pre-computed signals (UNDERVALUED, STRONG, ACCELERATING), DCF valuations, and CAGRs ready for agent prompts.",
   "type": "object",
   "schemaVersion": 1,
   "properties": {
