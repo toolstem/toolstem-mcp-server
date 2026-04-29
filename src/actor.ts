@@ -1,3 +1,23 @@
+/**
+ * Toolstem Finance MCP — Apify Actor entry point.
+ *
+ * Three-tier per-result pricing model (v1.2.9+):
+ *
+ *   Tool                 | PPE Event Name       | Tier     | Price
+ *   ---------------------|----------------------|----------|-------
+ *   get_stock_snapshot   | tool-call            | Cheap    | $0.005
+ *   get_company_metrics  | tool-call-standard   | Standard | $0.05
+ *   compare_companies    | tool-call-premium    | Premium  | $0.50
+ *
+ * Dollar amounts for `tool-call-standard` and `tool-call-premium` are
+ * configured in the Apify Console PPE settings — this code only fires
+ * `Actor.charge({ eventName })`. The Apify platform then deducts the
+ * configured amount from the caller's prepaid credit balance.
+ *
+ * Default-demo runs (no input.tool provided) skip all PPE charges — they
+ * exist solely for directory health-check probes and first-time evaluators
+ * and must never generate revenue or drain FMP API quota unnecessarily.
+ */
 import { Actor } from 'apify';
 
 import { getStockSnapshot } from './tools/get-stock-snapshot.js';
@@ -105,9 +125,22 @@ async function main(): Promise<void> {
       // eslint-disable-next-line no-console
       console.log('Default demonstration result cached for 6h. PPE charge skipped (probe).');
     } else {
-      const chargeResult = await Actor.charge({ eventName: 'tool-call' });
+      // Route to the correct PPE event based on the tool that was called.
+      // Dollar amounts are configured in Apify Console — this code only names
+      // the event; the platform resolves the charge.
+      // Type the value side as a union too — a typo like 'tool_call_standard'
+      // (underscore instead of hyphen) would otherwise compile and silently
+      // mis-charge. With this union, tsc fails loudly.
+      type PpeEventName = 'tool-call' | 'tool-call-standard' | 'tool-call-premium';
+      const PRICING_TIER: Record<ActorInput['tool'], PpeEventName> = {
+        get_stock_snapshot: 'tool-call',           // Cheap    — $0.005
+        get_company_metrics: 'tool-call-standard', // Standard — $0.05
+        compare_companies: 'tool-call-premium',    // Premium  — $0.50
+      };
+      const eventName = PRICING_TIER[input.tool];
+      const chargeResult = await Actor.charge({ eventName });
       // eslint-disable-next-line no-console
-      console.log('PPE charge result:', JSON.stringify(chargeResult));
+      console.log(`PPE charge result (${eventName}):`, JSON.stringify(chargeResult));
     }
 
     // Explicitly terminate the Actor run. Without this, the container keeps

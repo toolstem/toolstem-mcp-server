@@ -5,6 +5,31 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.9] - 2026-04-29
+
+### Added
+
+- **Three-tier per-result pricing model.** The Apify Actor now routes each tool call to a distinct PPE event name, enabling the Apify Console to charge different dollar amounts by tool:
+
+  | Tool | PPE Event Name | Tier | Price per call |
+  |---|---|---|---|
+  | `get_stock_snapshot` | `tool-call` | Cheap | $0.005 |
+  | `get_company_metrics` | `tool-call-standard` | Standard | $0.05 |
+  | `compare_companies` | `tool-call-premium` | Premium | $0.50 |
+
+  The `tool-call-standard` and `tool-call-premium` event names are **new**. Dollar amounts for these events must be configured in the Apify Console PPE settings before publishing — the code only fires `Actor.charge({ eventName })`; the platform resolves the charge.
+
+- **Rationale.** The previous flat $0.005/call structure was structurally below market and mis-priced by tool complexity. `get_stock_snapshot` is a fast, single-company quote synthesis — cheap is appropriate. `get_company_metrics` fans out to five financial-statement endpoints and computes CAGRs, signal classifications, and health scores — standard tier reflects that effort. `compare_companies` runs DCF and full ratio analysis across 2–5 companies in parallel — premium pricing reflects the compute intensity and the unique value of pre-ranked, cross-company intelligence. This matches the established Apify ecosystem norm: top revenue-generating actors price **per result** ($0.40–$1.50 per 1,000 results) rather than flat per call, capturing value proportional to the work performed and output delivered.
+
+- **No change to default-demo behavior.** Runs with no `input.tool` still skip all PPE charges (probe policy from v1.2.6 is preserved). Both versioned locations in `src/index.ts` (McpServer constructor, `/health` endpoint), version fields in `package.json` and `server.json` (top-level + `packages[0]`), and `.well-known/mcp/server-card.json` are all promoted to 1.2.9.
+
+### Changed
+
+- `src/actor.ts` — `Actor.charge({ eventName: 'tool-call' })` replaced with a `PRICING_TIER` routing block. Log line now includes the event name for auditability.
+- `src/index.ts` — version corrected from drifted `1.2.2` to `1.2.9` in both `McpServer({ version })` and the `/health` response.
+- `package.json`, `server.json` (both `version` and `packages[0].version`) — bumped from `1.2.8` to `1.2.9`.
+- `README.md` — pricing section updated with three-tier table.
+
 ## [1.2.8] - 2026-04-28
 
 ### Changed

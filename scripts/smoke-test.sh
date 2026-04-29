@@ -134,7 +134,7 @@ print(r if r else '')
 echo ""
 echo "[4/6] get_company_metrics (AAPL) – billing"
 RUN_JSON=$(run_and_get_run_json '{"tool":"get_company_metrics","symbol":"AAPL"}')
-warn "get_stock_snapshot billing" "skipped: owner runs are not charged by Apify"
+warn "get_company_metrics billing (Standard tier — tool-call-standard)" "skipped: owner runs are not charged by Apify"
 
 # --- Test 3: compare_companies ---
 echo ""

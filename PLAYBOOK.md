@@ -34,10 +34,16 @@ Everything we learned building and shipping `toolstem-mcp-server`. Use this as t
 **Version bump checklist** — every release touches:
 
 1. `package.json` → `"version"`
-2. `server.json` → `"version"` (appears twice in file)
-3. `src/index.ts` → `createServer()` version and `/health` endpoint
-4. `CHANGELOG.md` → add new entry
-5. Do NOT touch `.actor/actor.json` — that's Apify's MAJOR.MINOR metadata
+2. `server.json` → `"version"` (appears twice in file: top-level AND `packages[0].version`)
+3. `src/index.ts` → `createServer()` `McpServer({ version })` AND `/health` endpoint response
+4. `.well-known/mcp/server-card.json` → `"version"` (Smithery serves this live)
+5. `CHANGELOG.md` → add new entry
+6. Do NOT touch `.actor/actor.json` — that's Apify's MAJOR.MINOR metadata
+
+**Pre-publish version audit** — run this and verify ALL hits are the new version:
+```bash
+grep -rn "\"version\":" package.json server.json .well-known/ src/index.ts
+```
 
 ---
 

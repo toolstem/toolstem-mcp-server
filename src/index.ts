@@ -225,7 +225,7 @@ const CompareCompaniesOutputShape = {
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'toolstem-mcp-server',
-    version: '1.2.2',
+    version: '1.2.9',
   });
 
   server.registerTool(
@@ -370,7 +370,7 @@ async function runHttp(): Promise<void> {
   }, 60_000).unref();
 
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.2' });
+    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.9' });
   });
 
   app.post('/mcp', async (req: Request, res: Response) => {

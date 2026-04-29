@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-teal)](https://registry.modelcontextprotocol.io)
-[![Apify Store](https://img.shields.io/badge/Apify_Store-$0.005%2Fcall-blue)](https://apify.com/toolstem/toolstem-mcp-server)
+[![Apify Store](https://img.shields.io/badge/Apify_Store-per--result_pricing-blue)](https://apify.com/toolstem/toolstem-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 **Curated financial data MCP for AI agents — equity research in one call.**
@@ -331,7 +331,15 @@ or
 }
 ```
 
-Results are pushed to the default dataset. The actor monetizes per tool call via Apify's Pay-Per-Event model.
+Results are pushed to the default dataset. The actor uses Apify's Pay-Per-Event (PPE) model with three-tier per-result pricing:
+
+| Tool | Tier | Price per call |
+|---|---|---|
+| `get_stock_snapshot` | Cheap | $0.005 |
+| `get_company_metrics` | Standard | $0.05 |
+| `compare_companies` | Premium | $0.50 |
+
+Pricing is per result returned — you pay only for the tool you call. Default-demo runs (clicking **Run** with no input in the Apify Console) are free and serve as health-check probes; no charge is fired. Apify retains a 20% platform commission on all PPE revenue.
 
 ### Self-hosting (Cloudflare Workers / any Node runtime)
 
