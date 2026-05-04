@@ -366,7 +366,7 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 
 const client = new MultiServerMCPClient({
   toolstem_finance: {
-    transport: "streamable_http",
+    transport: "http",
     url: "https://mcp.toolstem.com/mcp/finance",
     // Add your x402-signing middleware via headers, OR run an x402
     // proxy locally and point url at it. See https://www.x402.org/clients.
