@@ -5,6 +5,19 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.12] - 2026-05-04
+
+### Changed — dependency range tightening
+
+Tightened semver ranges in `package.json` so the lowest version satisfying each range is a patched release. No behavior change; resolved versions in `package-lock.json` are unchanged.
+
+- `@modelcontextprotocol/sdk`: `^1.12.0` → `^1.29.0` (clears GHSA-345p-7cg4-v4c7, GHSA-8r9q-7v3j-jr4g, GHSA-w48q-cv73-mx4w false-positive findings)
+- `express`: `^4.21.0` → `^4.22.1`
+- `apify`: `^3.3.0` → `^3.7.0`
+- `zod`: `^3.24.0` → `^3.25.76`
+
+Motivated by the mcp-marketplace.io scanner, which reads `package.json` ranges worst-case (lowest satisfying version) rather than the resolved version, producing flagged findings even though installed versions are fully patched. `npm audit --omit=dev --audit-level=high` reports 0 high/critical.
+
 ## [1.2.10] - 2026-05-04
 
 ### Added — MCP tool annotations
