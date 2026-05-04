@@ -57,6 +57,20 @@ Most financial MCP servers expose one tool per API endpoint — forcing your age
 
 ## Tools
 
+The server registers **3 composite tools**, all sourced from FinancialModelingPrep. Every tool synthesizes 3+ upstream endpoints into a single agent-ready response with derived signals.
+
+| # | Tool | Required input | Optional input | Returns |
+|---|---|---|---|---|
+| 1 | `get_stock_snapshot` | `symbol` (string) | — | Quote + profile + DCF + rating, with `dcf_signal`, `market_cap_readable`, 52-week distance |
+| 2 | `get_company_metrics` | `symbol` (string) | `period` (`annual` \| `quarter`, default `annual`) | Profitability, financial health, cash flow, 3-year CAGRs, per-share metrics with `margin_trend`, `health_signal`, `growth_signal` |
+| 3 | `compare_companies` | `symbols` (string[2..5]) | — | Side-by-side comparison with auto-computed `rankings` (`lowest_pe`, `highest_margin`, `strongest_balance_sheet`, `best_growth`, `most_undervalued`, `highest_rated`) |
+
+All three tools advertise `readOnlyHint: true`, `destructiveHint: false`, `idempotentHint: true`, `openWorldHint: true`.
+
+**Free vs paid:** MCP `initialize` and `tools/list` are free. `tools/call` costs 0.01 USDC on Base mainnet (~$0.01) per invocation, paid via x402.
+
+---
+
 ### `get_stock_snapshot`
 
 Comprehensive stock overview combining quote, profile, DCF valuation, and rating into a single response.
@@ -374,7 +388,7 @@ const client = new MultiServerMCPClient({
 });
 
 const tools = await client.getTools();
-const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-5.4" }), tools });
+const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-4o-mini" }), tools });
 await agent.invoke({ messages: "Compare AAPL, MSFT, and GOOGL on valuation and growth." });
 ```
 
