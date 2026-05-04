@@ -214,7 +214,7 @@ const CompareCompaniesOutputShape = {
 export function createServer() {
     const server = new McpServer({
         name: 'toolstem-mcp-server',
-        version: '1.2.9',
+        version: '1.2.10',
     });
     server.registerTool('get_stock_snapshot', {
         title: 'Stock Snapshot',
@@ -228,6 +228,13 @@ export function createServer() {
                 .describe('Stock ticker symbol (e.g., AAPL, MSFT, TSLA)'),
         },
         outputSchema: StockSnapshotShape,
+        annotations: {
+            title: 'Stock Snapshot',
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+        },
     }, async ({ symbol }) => {
         const result = await getStockSnapshot(symbol);
         // Cast is safe: StockSnapshot interface mirrors StockSnapshotShape Zod schema.
@@ -253,6 +260,13 @@ export function createServer() {
                 .describe('Reporting period. Defaults to annual.'),
         },
         outputSchema: CompanyMetricsShape,
+        annotations: {
+            title: 'Company Metrics',
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+        },
     }, async ({ symbol, period }) => {
         const result = await getCompanyMetrics(symbol, period ?? 'annual');
         // Cast is safe: CompanyMetrics interface mirrors CompanyMetricsShape Zod schema.
@@ -281,6 +295,13 @@ export function createServer() {
                 .describe('2-5 stock ticker symbols to compare (e.g., ["AAPL", "MSFT", "GOOGL"])'),
         },
         outputSchema: CompareCompaniesOutputShape,
+        annotations: {
+            title: 'Company Comparison',
+            readOnlyHint: true,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: true,
+        },
     }, async ({ symbols }) => {
         const result = await compareCompanies(symbols);
         return {
@@ -327,7 +348,7 @@ async function runHttp() {
         }
     }, 60_000).unref();
     app.get('/health', (_req, res) => {
-        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.9' });
+        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.10' });
     });
     app.post('/mcp', async (req, res) => {
         try {
