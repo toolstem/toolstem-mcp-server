@@ -5,6 +5,20 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.10] - 2026-05-04
+
+### Added — MCP tool annotations
+
+All three tools (`get_stock_snapshot`, `get_company_metrics`, `compare_companies`) now expose the standard MCP `annotations` block:
+
+- `readOnlyHint: true` — tools never write to external state
+- `destructiveHint: false` — tools never mutate or delete
+- `idempotentHint: true` — same input yields same output across calls
+- `openWorldHint: true` — tools fetch from external upstreams (FMP)
+- `title` — human-readable display label
+
+Motivated by the Anthropic Connectors Directory submission requirement that every submitted tool include `title` plus `readOnlyHint`/`destructiveHint`. Per past directory-rejection analysis, missing annotations account for roughly 30% of rejections. Purely additive metadata; no behavioral change.
+
 ## [1.2.9] - 2026-04-29
 
 ### Added

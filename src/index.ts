@@ -225,7 +225,7 @@ const CompareCompaniesOutputShape = {
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'toolstem-mcp-server',
-    version: '1.2.9',
+    version: '1.2.10',
   });
 
   server.registerTool(
@@ -243,6 +243,13 @@ export function createServer(): McpServer {
           .describe('Stock ticker symbol (e.g., AAPL, MSFT, TSLA)'),
       },
       outputSchema: StockSnapshotShape,
+      annotations: {
+        title: 'Stock Snapshot',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ symbol }) => {
       const result = await getStockSnapshot(symbol);
@@ -274,6 +281,13 @@ export function createServer(): McpServer {
           .describe('Reporting period. Defaults to annual.'),
       },
       outputSchema: CompanyMetricsShape,
+      annotations: {
+        title: 'Company Metrics',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ symbol, period }) => {
       const result = await getCompanyMetrics(symbol, period ?? 'annual');
@@ -311,6 +325,13 @@ export function createServer(): McpServer {
           .describe('2-5 stock ticker symbols to compare (e.g., ["AAPL", "MSFT", "GOOGL"])'),
       },
       outputSchema: CompareCompaniesOutputShape,
+      annotations: {
+        title: 'Company Comparison',
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
     },
     async ({ symbols }) => {
       const result = await compareCompanies(symbols);
@@ -370,7 +391,7 @@ async function runHttp(): Promise<void> {
   }, 60_000).unref();
 
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.9' });
+    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.10' });
   });
 
   app.post('/mcp', async (req: Request, res: Response) => {
