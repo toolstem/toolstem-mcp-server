@@ -16,9 +16,11 @@ concurrency:
 
 env:
   # Pinned mcp-publisher release — update intentionally, never floating.
-  MCP_PUBLISHER_VERSION: v1.7.2
-  # SHA-256 of mcp-publisher_linux_amd64.tar.gz from registry_1.7.2_checksums.txt
-  MCP_PUBLISHER_LINUX_AMD64_SHA256: 9a324bab0bc69bf957599d7975b663d7c4169eba2cdc00baf0f589b847e03898
+  # v1.7.6+ binds OIDC audience per-deployment; older clients fail with
+  # "invalid audience" against the upgraded production registry.
+  MCP_PUBLISHER_VERSION: v1.7.7
+  # SHA-256 of mcp-publisher_linux_amd64.tar.gz from registry_1.7.7_checksums.txt
+  MCP_PUBLISHER_LINUX_AMD64_SHA256: a7aeba18c00caeae509d1dd74494b0a260a4245bcc65b25b8284ad709fa71676
 
 jobs:
   publish:
