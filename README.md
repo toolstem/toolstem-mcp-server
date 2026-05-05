@@ -2,7 +2,6 @@
 
 [![npm version](https://img.shields.io/npm/v/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-teal)](https://registry.modelcontextprotocol.io)
-[![Apify Store](https://img.shields.io/badge/Apify_Store-per--result_pricing-blue)](https://apify.com/toolstem/toolstem-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 **Curated financial data MCP for AI agents — equity research in one call.**
@@ -15,47 +14,67 @@ Unlike passthrough wrappers that just expose a vendor's REST API, every Toolstem
 
 One call. One agent-friendly JSON response. No nested arrays to parse, no cross-endpoint stitching, no null-checking boilerplate.
 
+The hosted endpoint lives at **`https://mcp.toolstem.com/mcp/finance`**. Product page: <https://toolstem.com/finance/>.
+
 ---
 
-## Try It Now (30 seconds)
+## Free vs paid
 
-**Apify Console** — click **Run** with default input. AAPL stock snapshot returns in ~3 seconds, no charge:
+- **MCP `initialize` and `tools/list` are free** — discovery, schema introspection, and health checks never cost anything.
+- **`tools/call` costs 0.01 USDC on Base mainnet (~$0.01) per invocation, paid via [x402](https://www.x402.org).** No API key, no signup, no marketplace account required — the agent's wallet pays directly.
 
-> https://apify.com/toolstem/toolstem-mcp-server
+Self-hosted (stdio or your own HTTP) skips the x402 paywall entirely; you bring your own `FMP_API_KEY` and pay FMP directly.
 
-**Claude Desktop** — drop into your `claude_desktop_config.json`:
+---
+
+## Try it in Claude Desktop
+
+Drop this into your `claude_desktop_config.json` to use the hosted, pay-per-call endpoint (no API key needed — your agent's wallet pays $0.01 USDC per `tools/call` via x402):
 
 ```json
 {
   "mcpServers": {
-    "toolstem": {
-      "command": "npx",
-      "args": ["-y", "toolstem-mcp-server"],
-      "env": { "FMP_API_KEY": "your-key-from-financialmodelingprep.com" }
+    "toolstem-finance": {
+      "url": "https://mcp.toolstem.com/mcp/finance"
     }
   }
 }
 ```
 
-Restart Claude. Ask: *"Use Toolstem to get a snapshot of NVDA."*
+Restart Claude Desktop, then ask: *"Use Toolstem to get a snapshot of NVDA."*
 
-**npm** — `npx toolstem-mcp-server` runs the server locally over stdio.
+Prefer running locally with your own FMP key? See [Self-hosting](#self-hosting) below.
 
 ---
 
-## Why Toolstem?
+## How it works
 
-Most financial MCP servers expose one tool per API endpoint — forcing your agent to make 4–5 sequential calls, write glue code, and reason about raw data shapes. Toolstem is built differently:
+Toolstem ships as a Node MCP server (this repo) **and** as a hosted, x402-gated proxy.
 
-- **Parallel data fetching** — every tool fans out to multiple sources concurrently.
-- **Derived signals** — human-readable recommendations like `UNDERVALUED`, `STRONG`, `ACCELERATING` computed from raw numbers.
-- **Pre-computed math** — CAGRs, YoY growth, margin trends, distance from 52-week high/low, FCF yield, and more are already in the response.
-- **Flat, predictable schema** — no deeply nested vendor quirks leaking into agent prompts.
-- **Graceful degradation** — if one upstream endpoint fails, the rest of the response still comes through with nulls in place.
+```
+Agent ──MCP──▶ Cloudflare Worker (x402 paywall) ──MCP──▶ Toolstem MCP server ──REST──▶ Financial Modeling Prep
+                  │                                          │
+                  └─ free: initialize, tools/list            └─ composite tool: fans out to 3–5 FMP endpoints
+                  └─ paid: tools/call → 0.01 USDC on Base       in parallel, derives signals, returns flat JSON
+```
+
+- **Cloudflare Worker** terminates the public MCP connection at `mcp.toolstem.com` and enforces the x402 payment for `tools/call`.
+- **MCP server** (this package) implements the 3 composite tools and talks to Financial Modeling Prep.
+- **x402 on Base mainnet** handles the micropayment — settlement is sub-second, no off-chain accounts.
 
 ---
 
 ## Tools
+
+Three composite tools, each one synthesizing multiple FMP endpoints with derived signals and pre-computed math.
+
+| Tool | Title | Required input | Optional input |
+|---|---|---|---|
+| [`get_stock_snapshot`](#get_stock_snapshot) | Stock Snapshot | `symbol` (string) | — |
+| [`get_company_metrics`](#get_company_metrics) | Company Metrics | `symbol` (string) | `period` (`annual` \| `quarter`, default `annual`) |
+| [`compare_companies`](#compare_companies) | Company Comparison | `symbols` (string[2..5]) | — |
+
+All three are read-only, idempotent, and safe for agent retry.
 
 ### `get_stock_snapshot`
 
@@ -228,6 +247,8 @@ Side-by-side comparison of 2–5 companies across price, valuation, profitabilit
 }
 ```
 
+`symbols` must be an array of 2 to 5 ticker strings.
+
 **Example output (truncated):**
 
 ```json
@@ -273,7 +294,57 @@ Side-by-side comparison of 2–5 companies across price, valuation, profitabilit
 
 ---
 
-## Installation
+## Why Toolstem?
+
+Most financial MCP servers expose one tool per API endpoint — forcing your agent to make 4–5 sequential calls, write glue code, and reason about raw data shapes. Toolstem is built differently:
+
+- **Parallel data fetching** — every tool fans out to multiple sources concurrently.
+- **Derived signals** — human-readable recommendations like `UNDERVALUED`, `STRONG`, `ACCELERATING` computed from raw numbers.
+- **Pre-computed math** — CAGRs, YoY growth, margin trends, distance from 52-week high/low, FCF yield, and more are already in the response.
+- **Flat, predictable schema** — no deeply nested vendor quirks leaking into agent prompts.
+- **Graceful degradation** — if one upstream endpoint fails, the rest of the response still comes through with nulls in place.
+
+---
+
+## Hosted endpoint (recommended)
+
+```
+https://mcp.toolstem.com/mcp/finance
+```
+
+- Streamable HTTP MCP transport.
+- Free for `initialize` and `tools/list`.
+- 0.01 USDC on Base mainnet per `tools/call`, settled via [x402](https://www.x402.org).
+- No API key required — your agent's wallet pays directly.
+
+### Use with LangChain.js
+
+The official [`@langchain/mcp-adapters`](https://www.npmjs.com/package/@langchain/mcp-adapters) library connects directly:
+
+```ts
+import { MultiServerMCPClient } from "@langchain/mcp-adapters";
+import { ChatOpenAI } from "@langchain/openai";
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+
+const client = new MultiServerMCPClient({
+  toolstem_finance: {
+    transport: "http",
+    url: "https://mcp.toolstem.com/mcp/finance",
+    // Add your x402-signing middleware via headers, OR run an x402
+    // proxy locally and point url at it. See https://www.x402.org/clients.
+  },
+});
+
+const tools = await client.getTools();
+const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-4o-mini" }), tools });
+await agent.invoke({ messages: "Compare AAPL, MSFT, and GOOGL on valuation and growth." });
+```
+
+---
+
+## Self-hosting
+
+Run the Node MCP server locally with your own FMP key — no x402, no per-call charge beyond your FMP quota.
 
 ### npm
 
@@ -293,9 +364,9 @@ Run as HTTP (Streamable HTTP transport) server:
 FMP_API_KEY=your_key_here PORT=3000 toolstem-mcp-server --http
 ```
 
-### Claude Desktop
+Your MCP client can then connect to `POST http://your-host:3000/mcp`.
 
-Add to your `claude_desktop_config.json`:
+### Claude Desktop (self-hosted)
 
 ```json
 {
@@ -311,39 +382,7 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-### Apify
-
-Available on the Apify Store as the `toolstem-financial-data` Actor. Call it from your Apify workflow with input:
-
-```json
-{
-  "tool": "get_stock_snapshot",
-  "symbol": "AAPL"
-}
-```
-
-or
-
-```json
-{
-  "tool": "compare_companies",
-  "symbols": ["AAPL", "MSFT", "GOOGL"]
-}
-```
-
-Results are pushed to the default dataset. The actor uses Apify's Pay-Per-Event (PPE) model with three-tier per-result pricing:
-
-| Tool | Tier | Price per call |
-|---|---|---|
-| `get_stock_snapshot` | Cheap | $0.005 |
-| `get_company_metrics` | Standard | $0.05 |
-| `compare_companies` | Premium | $0.50 |
-
-Pricing is per result returned — you pay only for the tool you call. Default-demo runs (clicking **Run** with no input in the Apify Console) are free and serve as health-check probes; no charge is fired. Apify retains a 20% platform commission on all PPE revenue.
-
-### Self-hosting (Cloudflare Workers / any Node runtime)
-
-Build and run the HTTP transport:
+### From source
 
 ```bash
 npm install
@@ -351,42 +390,13 @@ npm run build
 FMP_API_KEY=your_key npm run start:http
 ```
 
-Your MCP client can then connect to `POST http://your-host:3000/mcp`.
-
-### Use with LangChain.js (hosted, agent pays via x402)
-
-The hosted endpoint at `https://mcp.toolstem.com/mcp/finance` is gated by [x402](https://www.x402.org) on Base mainnet. Agents pay $0.01 USDC per call directly from their own wallet — no API key, no signup, no marketplace account required. This is the AI-to-AI revenue path.
-
-The official [`@langchain/mcp-adapters`](https://www.npmjs.com/package/@langchain/mcp-adapters) library connects directly:
-
-```ts
-import { MultiServerMCPClient } from "@langchain/mcp-adapters";
-import { ChatOpenAI } from "@langchain/openai";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-
-const client = new MultiServerMCPClient({
-  toolstem_finance: {
-    transport: "http",
-    url: "https://mcp.toolstem.com/mcp/finance",
-    // Add your x402-signing middleware via headers, OR run an x402
-    // proxy locally and point url at it. See https://www.x402.org/clients.
-  },
-});
-
-const tools = await client.getTools();
-const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-5.4" }), tools });
-await agent.invoke({ messages: "Compare AAPL, MSFT, and GOOGL on valuation and growth." });
-```
-
-For agents tethered to a human's Apify account, point at `https://api.apify.com/v2/acts/toolstem~toolstem-mcp-server/run-sync` instead and pass your Apify token in the `Authorization: Bearer ...` header. Apify handles billing under the PPE table above.
-
 ---
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `FMP_API_KEY` | Yes | Financial Modeling Prep API key. Get one at [financialmodelingprep.com](https://financialmodelingprep.com). |
+| `FMP_API_KEY` | Yes (self-hosted) | Financial Modeling Prep API key. Get one at [financialmodelingprep.com](https://financialmodelingprep.com). Not needed when calling the hosted endpoint. |
 | `PORT` | No | Port for HTTP transport. Defaults to `3000`. |
 
 ---
@@ -408,7 +418,7 @@ npm run start:http    # run built HTTP server
 ```
 src/
 ├── index.ts          # MCP server entry (stdio + Streamable HTTP)
-├── actor.ts          # Apify Actor entry
+├── actor.ts          # Apify Actor entry (legacy)
 ├── services/
 │   └── fmp.ts        # Financial Modeling Prep API client
 ├── tools/
@@ -429,4 +439,4 @@ MIT — see [LICENSE](./LICENSE).
 
 ---
 
-**Toolstem** — curated financial intelligence for the agent-native economy.
+**Toolstem** — curated financial intelligence for the agent-native economy. <https://toolstem.com/finance/>
