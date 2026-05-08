@@ -491,9 +491,9 @@ async function runHttp(): Promise<void> {
       }
       await transport.handleRequest(req, res, req.body);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      console.error('[mcp] unhandled error:', err);
       if (!res.headersSent) {
-        res.status(500).json({ error: message });
+        res.status(500).json({ error: 'Internal server error' });
       }
     }
   });
