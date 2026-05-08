@@ -5,6 +5,22 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.13] - 2026-05-08
+
+### Security — HTTP mode hardened
+
+HTTP mode (`--http`) now defaults to localhost; remote access requires explicit opt-in and bearer token.
+
+- **Default bind `127.0.0.1`**: HTTP server no longer listens on `0.0.0.0`. Set `ALLOW_REMOTE=1` to bind all interfaces.
+- **Mandatory auth for remote**: When `ALLOW_REMOTE=1`, the server refuses to start unless `MCP_AUTH_TOKEN` is set (or `MCP_AUTH_DISABLED=1` for explicit override).
+- **Bearer-token middleware**: All `/mcp` routes require `Authorization: Bearer <token>` when auth is enabled. Uses `crypto.timingSafeEqual` for constant-time comparison.
+- **Per-IP rate limiting**: `/mcp` is rate-limited to 150 requests/minute per IP via `express-rate-limit`.
+- **Startup banner**: Prints bind address, auth status, and a warning when auth is disabled on a remote-accessible server.
+- `/health` remains unauthenticated for load-balancer and uptime probes (returns no secrets).
+- Added `express-rate-limit` dependency.
+
+Credit: Ryan (responsible disclosure).
+
 ## [1.2.12] - 2026-05-04
 
 ### Changed — dependency range tightening

@@ -19,7 +19,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
-import { randomUUID } from 'node:crypto';
+import rateLimit from 'express-rate-limit';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { getStockSnapshot } from './tools/get-stock-snapshot.js';
 import { getCompanyMetrics } from './tools/get-company-metrics.js';
@@ -214,7 +215,7 @@ const CompareCompaniesOutputShape = {
 export function createServer() {
     const server = new McpServer({
         name: 'toolstem-mcp-server',
-        version: '1.2.10',
+        version: '1.2.13',
     });
     server.registerTool('get_stock_snapshot', {
         title: 'Stock Snapshot',
@@ -329,9 +330,61 @@ async function runHttp() {
         console.error('ERROR: FMP_API_KEY environment variable is required.');
         process.exit(1);
     }
+    // ---------------------------------------------------------------------------
+    // Bind address: localhost by default, 0.0.0.0 only with ALLOW_REMOTE=1
+    // ---------------------------------------------------------------------------
+    const allowRemote = process.env.ALLOW_REMOTE === '1';
+    const bindHost = allowRemote ? '0.0.0.0' : '127.0.0.1';
+    // ---------------------------------------------------------------------------
+    // Auth: required when ALLOW_REMOTE=1 unless explicitly disabled
+    // ---------------------------------------------------------------------------
+    const authToken = process.env.MCP_AUTH_TOKEN;
+    const authDisabled = process.env.MCP_AUTH_DISABLED === '1';
+    if (allowRemote && !authToken && !authDisabled) {
+        console.error('ERROR: ALLOW_REMOTE=1 requires MCP_AUTH_TOKEN to be set.\n' +
+            'Set MCP_AUTH_TOKEN=<secret> or, if you accept the risk, set MCP_AUTH_DISABLED=1 to skip auth.');
+        process.exit(1);
+    }
+    const authEnabled = !!authToken && !authDisabled;
+    // Bearer-token middleware using constant-time comparison on equal-length buffers
+    function bearerAuth(req, res, next) {
+        if (!authEnabled) {
+            next();
+            return;
+        }
+        const header = req.header('authorization') ?? '';
+        const prefix = 'Bearer ';
+        if (!header.startsWith(prefix)) {
+            res.status(401).json({ error: 'Missing or malformed Authorization header' });
+            return;
+        }
+        const supplied = Buffer.from(header.slice(prefix.length));
+        const expected = Buffer.from(authToken);
+        // Pad to equal length before timingSafeEqual (required by Node)
+        const maxLen = Math.max(supplied.length, expected.length);
+        const a = Buffer.alloc(maxLen);
+        const b = Buffer.alloc(maxLen);
+        supplied.copy(a);
+        expected.copy(b);
+        if (supplied.length !== expected.length || !timingSafeEqual(a, b)) {
+            res.status(403).json({ error: 'Invalid bearer token' });
+            return;
+        }
+        next();
+    }
     const app = express();
     app.use(express.json({ limit: '4mb' }));
     const port = Number.parseInt(process.env.PORT ?? '3000', 10);
+    // ---------------------------------------------------------------------------
+    // Rate limiting on /mcp — 150 requests per minute per IP
+    // ---------------------------------------------------------------------------
+    const mcpLimiter = rateLimit({
+        windowMs: 60_000,
+        limit: 150,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        message: { error: 'Rate limit exceeded — try again in a minute' },
+    });
     const sessions = new Map();
     // Sweep stale sessions every 60 seconds (30-minute inactivity TTL)
     const SESSION_TTL_MS = 30 * 60 * 1000;
@@ -347,10 +400,12 @@ async function runHttp() {
             }
         }
     }, 60_000).unref();
+    // /health is intentionally unauthenticated: load balancers and uptime probes
+    // need to reach it without credentials. It exposes no secrets or user data.
     app.get('/health', (_req, res) => {
-        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.10' });
+        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.13' });
     });
-    app.post('/mcp', async (req, res) => {
+    app.post('/mcp', mcpLimiter, bearerAuth, async (req, res) => {
         try {
             const sessionId = req.header('mcp-session-id');
             let transport;
@@ -389,7 +444,7 @@ async function runHttp() {
             }
         }
     });
-    app.get('/mcp', async (req, res) => {
+    app.get('/mcp', mcpLimiter, bearerAuth, async (req, res) => {
         const sessionId = req.header('mcp-session-id');
         if (!sessionId || !sessions.has(sessionId)) {
             res.status(400).json({ error: 'Missing or unknown mcp-session-id' });
@@ -399,7 +454,7 @@ async function runHttp() {
         entry.lastActivity = Date.now();
         await entry.transport.handleRequest(req, res);
     });
-    app.delete('/mcp', async (req, res) => {
+    app.delete('/mcp', mcpLimiter, bearerAuth, async (req, res) => {
         const sessionId = req.header('mcp-session-id');
         if (!sessionId || !sessions.has(sessionId)) {
             res.status(400).json({ error: 'Missing or unknown mcp-session-id' });
@@ -409,9 +464,14 @@ async function runHttp() {
         entry.lastActivity = Date.now();
         await entry.transport.handleRequest(req, res);
     });
-    app.listen(port, () => {
+    app.listen(port, bindHost, () => {
         // eslint-disable-next-line no-console
-        console.log(`Toolstem MCP server listening on http://0.0.0.0:${port}/mcp`);
+        console.log(`\n  Toolstem MCP server v1.2.13\n` +
+            `  Listening on http://${bindHost}:${port}/mcp\n` +
+            `  Auth:    ${authEnabled ? 'ENABLED (bearer token)' : 'DISABLED'}\n` +
+            `  Remote:  ${allowRemote ? 'ALLOWED (0.0.0.0)' : 'localhost only (127.0.0.1)'}` +
+            (!authEnabled && allowRemote ? '\n  ⚠  WARNING: Remote access is open with no authentication!' : '') +
+            '\n');
     });
 }
 // -----------------------------------------------------------------------------
