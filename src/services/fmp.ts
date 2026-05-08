@@ -402,9 +402,26 @@ export class FmpClient {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   // v1.2.1 diagnostic: per-chunk stats from the last screenStocks call
-  public _lastScreenDiag: Array<{ size: number; returned: number; ms: number }> = [];
-  public _lastHttpStatus: number | null = null;
-  public _lastHttpBody: string = '';
+  private _lastScreenDiag: Array<{ size: number; returned: number; ms: number }> = [];
+  private _lastHttpStatus: number | null = null;
+  private _lastHttpBody: string = '';
+
+  /**
+   * Returns a sanitized summary of the last diagnostic state.
+   * Strips raw HTTP bodies (which may contain API key remnants in URLs)
+   * and aggregates status info for safe external consumption.
+   */
+  getDiagnosticSummary(): {
+    chunks: Array<{ size: number; returned: number; ms: number }>;
+    last_http_status: number | null;
+    had_error_body: boolean;
+  } {
+    return {
+      chunks: this._lastScreenDiag,
+      last_http_status: this._lastHttpStatus,
+      had_error_body: this._lastHttpBody.length > 0,
+    };
+  }
 
   constructor(apiKey?: string, baseUrl: string = FMP_BASE_URL) {
     const key = apiKey ?? process.env.FMP_API_KEY;

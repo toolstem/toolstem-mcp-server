@@ -226,7 +226,7 @@ const CompareCompaniesOutputShape = {
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'toolstem-mcp-server',
-    version: '1.2.13',
+    version: '1.2.14',
   });
 
   server.registerTool(
@@ -368,18 +368,41 @@ async function runHttp(): Promise<void> {
   }
 
   // ---------------------------------------------------------------------------
-  // Bind address: localhost by default, 0.0.0.0 only with ALLOW_REMOTE=1
+  // Auth + bind address logic
   // ---------------------------------------------------------------------------
   const allowRemote = process.env.ALLOW_REMOTE === '1';
-  const bindHost = allowRemote ? '0.0.0.0' : '127.0.0.1';
-
-  // ---------------------------------------------------------------------------
-  // Auth: required when ALLOW_REMOTE=1 unless explicitly disabled
-  // ---------------------------------------------------------------------------
   const authToken = process.env.MCP_AUTH_TOKEN;
   const authDisabled = process.env.MCP_AUTH_DISABLED === '1';
+  const iKnowDangerous = process.env.I_KNOW_THIS_IS_DANGEROUS === '1';
 
-  if (allowRemote && !authToken && !authDisabled) {
+  // ---------------------------------------------------------------------------
+  // MCP_AUTH_DISABLED semantics (v1.2.14):
+  //   - Default: local-only (127.0.0.1), ignores ALLOW_REMOTE
+  //   - Exception: ALLOW_REMOTE=1 + I_KNOW_THIS_IS_DANGEROUS=1 → 0.0.0.0
+  //     with a periodic security warning banner
+  // Without MCP_AUTH_DISABLED: existing logic (ALLOW_REMOTE controls bind)
+  // ---------------------------------------------------------------------------
+  let bindHost: string;
+  let dangerInterval: ReturnType<typeof setInterval> | undefined;
+
+  if (authDisabled) {
+    if (allowRemote && iKnowDangerous) {
+      bindHost = '0.0.0.0';
+      // Print immediately and repeat every 60 seconds
+      console.warn('[SECURITY WARNING] Server running on 0.0.0.0 with authentication DISABLED. This is dangerous in production.');
+      dangerInterval = setInterval(() => {
+        console.warn('[SECURITY WARNING] Server running on 0.0.0.0 with authentication DISABLED. This is dangerous in production.');
+      }, 60_000);
+      dangerInterval.unref();
+    } else {
+      // MCP_AUTH_DISABLED forces local-only regardless of ALLOW_REMOTE
+      bindHost = '127.0.0.1';
+    }
+  } else {
+    bindHost = allowRemote ? '0.0.0.0' : '127.0.0.1';
+  }
+
+  if (!authDisabled && allowRemote && !authToken) {
     console.error(
       'ERROR: ALLOW_REMOTE=1 requires MCP_AUTH_TOKEN to be set.\n' +
       'Set MCP_AUTH_TOKEN=<secret> or, if you accept the risk, set MCP_AUTH_DISABLED=1 to skip auth.',
@@ -454,7 +477,7 @@ async function runHttp(): Promise<void> {
   // /health is intentionally unauthenticated: load balancers and uptime probes
   // need to reach it without credentials. It exposes no secrets or user data.
   app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.13' });
+    res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.14' });
   });
 
   app.post('/mcp', mcpLimiter, bearerAuth, async (req: Request, res: Response) => {
@@ -520,14 +543,16 @@ async function runHttp(): Promise<void> {
     await entry.transport.handleRequest(req, res);
   });
 
+  const isRemoteBind = bindHost === '0.0.0.0';
+
   app.listen(port, bindHost, () => {
     // eslint-disable-next-line no-console
     console.log(
-      `\n  Toolstem MCP server v1.2.13\n` +
+      `\n  Toolstem MCP server v1.2.14\n` +
       `  Listening on http://${bindHost}:${port}/mcp\n` +
       `  Auth:    ${authEnabled ? 'ENABLED (bearer token)' : 'DISABLED'}\n` +
-      `  Remote:  ${allowRemote ? 'ALLOWED (0.0.0.0)' : 'localhost only (127.0.0.1)'}` +
-      (!authEnabled && allowRemote ? '\n  ⚠  WARNING: Remote access is open with no authentication!' : '') +
+      `  Remote:  ${isRemoteBind ? 'ALLOWED (0.0.0.0)' : 'localhost only (127.0.0.1)'}` +
+      (!authEnabled && isRemoteBind ? '\n  ⚠  WARNING: Remote access is open with no authentication!' : '') +
       '\n',
     );
   });

@@ -12,6 +12,18 @@ export class FmpClient {
     _lastScreenDiag = [];
     _lastHttpStatus = null;
     _lastHttpBody = '';
+    /**
+     * Returns a sanitized summary of the last diagnostic state.
+     * Strips raw HTTP bodies (which may contain API key remnants in URLs)
+     * and aggregates status info for safe external consumption.
+     */
+    getDiagnosticSummary() {
+        return {
+            chunks: this._lastScreenDiag,
+            last_http_status: this._lastHttpStatus,
+            had_error_body: this._lastHttpBody.length > 0,
+        };
+    }
     constructor(apiKey, baseUrl = FMP_BASE_URL) {
         const key = apiKey ?? process.env.FMP_API_KEY;
         if (!key) {

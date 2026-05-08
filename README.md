@@ -372,13 +372,21 @@ FMP_API_KEY=your_key ALLOW_REMOTE=1 MCP_AUTH_TOKEN=my-secret toolstem-mcp-server
 
 Clients must send `Authorization: Bearer my-secret` on every `/mcp` request.
 
-**HTTP — remote, auth explicitly disabled** (not recommended):
+**HTTP — auth disabled (local only)**:
 
 ```bash
-FMP_API_KEY=your_key ALLOW_REMOTE=1 MCP_AUTH_DISABLED=1 toolstem-mcp-server --http
+FMP_API_KEY=your_key MCP_AUTH_DISABLED=1 toolstem-mcp-server --http
 ```
 
-> **Warning:** This exposes your FMP API key to anyone who can reach the port. Only use for trusted networks or development.
+> `MCP_AUTH_DISABLED=1` forces the server to bind `127.0.0.1` regardless of `ALLOW_REMOTE`. This is a safe "skip auth, local only" mode for development.
+
+**HTTP — remote without auth (dangerous)**:
+
+```bash
+FMP_API_KEY=your_key ALLOW_REMOTE=1 MCP_AUTH_DISABLED=1 I_KNOW_THIS_IS_DANGEROUS=1 toolstem-mcp-server --http
+```
+
+> **Warning:** This exposes your FMP API key to anyone who can reach the port. Requires all three env vars. A `[SECURITY WARNING]` banner prints at startup and repeats every 60 seconds. Only use for trusted networks or development.
 
 ### Claude Desktop (self-hosted)
 
@@ -414,7 +422,8 @@ FMP_API_KEY=your_key npm run start:http
 | `PORT` | No | Port for HTTP transport. Defaults to `3000`. |
 | `ALLOW_REMOTE` | No | Set to `1` to bind HTTP on `0.0.0.0` instead of `127.0.0.1`. |
 | `MCP_AUTH_TOKEN` | When `ALLOW_REMOTE=1` | Bearer token for authenticating `/mcp` requests. |
-| `MCP_AUTH_DISABLED` | No | Set to `1` to explicitly skip auth even with `ALLOW_REMOTE=1`. |
+| `MCP_AUTH_DISABLED` | No | Set to `1` to skip auth. Forces `127.0.0.1` bind unless `I_KNOW_THIS_IS_DANGEROUS=1` is also set. |
+| `I_KNOW_THIS_IS_DANGEROUS` | No | Set to `1` alongside `ALLOW_REMOTE=1` and `MCP_AUTH_DISABLED=1` to allow remote access without auth. Triggers a periodic warning banner. |
 
 ---
 

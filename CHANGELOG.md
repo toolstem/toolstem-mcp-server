@@ -5,6 +5,11 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.14] - 2026-05-08
+### Security
+- Harden FmpClient diagnostic fields — `_lastHttpBody`, `_lastHttpStatus`, `_lastScreenDiag` are now private
+- Tighten `MCP_AUTH_DISABLED` semantics — only valid for local-only mode; remote-without-auth now requires explicit `I_KNOW_THIS_IS_DANGEROUS=1` plus a periodic warning banner
+
 ## [1.2.13] - 2026-05-08
 
 ### Security — HTTP mode hardened

@@ -376,13 +376,23 @@ export type Period = 'annual' | 'quarter';
 export declare class FmpClient {
     private readonly apiKey;
     private readonly baseUrl;
-    _lastScreenDiag: Array<{
-        size: number;
-        returned: number;
-        ms: number;
-    }>;
-    _lastHttpStatus: number | null;
-    _lastHttpBody: string;
+    private _lastScreenDiag;
+    private _lastHttpStatus;
+    private _lastHttpBody;
+    /**
+     * Returns a sanitized summary of the last diagnostic state.
+     * Strips raw HTTP bodies (which may contain API key remnants in URLs)
+     * and aggregates status info for safe external consumption.
+     */
+    getDiagnosticSummary(): {
+        chunks: Array<{
+            size: number;
+            returned: number;
+            ms: number;
+        }>;
+        last_http_status: number | null;
+        had_error_body: boolean;
+    };
     constructor(apiKey?: string, baseUrl?: string);
     /**
      * Low-level GET helper. Returns parsed JSON, or null on empty/error.
