@@ -237,12 +237,8 @@ export async function screenStocks(
       },
       unsupported_filters: unsupported.length > 0 ? unsupported : undefined,
       notes,
-      // v1.2.1 diagnostics — remove in v1.2.2 once issue resolved
-      diagnostics: {
-        chunks: fmp._lastScreenDiag,
-        last_http_status: fmp._lastHttpStatus,
-        last_http_body: fmp._lastHttpBody,
-      },
+      // v1.2.1 diagnostics — sanitized via getDiagnosticSummary() (raw bodies stripped)
+      diagnostics: fmp.getDiagnosticSummary(),
     },
   };
 }
