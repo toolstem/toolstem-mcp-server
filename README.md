@@ -352,19 +352,33 @@ Run the Node MCP server locally with your own FMP key — no x402, no per-call c
 npm install -g toolstem-mcp-server
 ```
 
-Run as stdio server:
+**stdio** (default — for Claude Desktop, Cursor, etc.):
 
 ```bash
 FMP_API_KEY=your_key_here toolstem-mcp-server
 ```
 
-Run as HTTP (Streamable HTTP transport) server:
+**HTTP — local only** (default, binds 127.0.0.1):
 
 ```bash
-FMP_API_KEY=your_key_here PORT=3000 toolstem-mcp-server --http
+FMP_API_KEY=your_key_here toolstem-mcp-server --http
 ```
 
-Your MCP client can then connect to `POST http://your-host:3000/mcp`.
+**HTTP — remote + auth** (binds 0.0.0.0, requires bearer token):
+
+```bash
+FMP_API_KEY=your_key ALLOW_REMOTE=1 MCP_AUTH_TOKEN=my-secret toolstem-mcp-server --http
+```
+
+Clients must send `Authorization: Bearer my-secret` on every `/mcp` request.
+
+**HTTP — remote, auth explicitly disabled** (not recommended):
+
+```bash
+FMP_API_KEY=your_key ALLOW_REMOTE=1 MCP_AUTH_DISABLED=1 toolstem-mcp-server --http
+```
+
+> **Warning:** This exposes your FMP API key to anyone who can reach the port. Only use for trusted networks or development.
 
 ### Claude Desktop (self-hosted)
 
@@ -398,6 +412,9 @@ FMP_API_KEY=your_key npm run start:http
 |----------|----------|-------------|
 | `FMP_API_KEY` | Yes (self-hosted) | Financial Modeling Prep API key. Get one at [financialmodelingprep.com](https://financialmodelingprep.com). Not needed when calling the hosted endpoint. |
 | `PORT` | No | Port for HTTP transport. Defaults to `3000`. |
+| `ALLOW_REMOTE` | No | Set to `1` to bind HTTP on `0.0.0.0` instead of `127.0.0.1`. |
+| `MCP_AUTH_TOKEN` | When `ALLOW_REMOTE=1` | Bearer token for authenticating `/mcp` requests. |
+| `MCP_AUTH_DISABLED` | No | Set to `1` to explicitly skip auth even with `ALLOW_REMOTE=1`. |
 
 ---
 
