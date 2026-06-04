@@ -5,6 +5,11 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.16] - 2026-06-04
+### Documentation
+- **Hosted endpoint as default path (README update).** The README now leads with the hosted x402 endpoint as the recommended path and moves self-hosting to an Advanced section. Documentation-only change (PR #9, merged); no payment, auth, or x402 logic touched. Republished so the updated README propagates to mcp.so and Glama.
+- Version promoted to 1.2.16 across `package.json`, `server.json` (top-level + `packages[0]`), both versioned locations in `src/index.ts`, and `.well-known/mcp/server-card.json`.
+
 ## [1.2.15] - 2026-06-04
 ### Security / Billing
 - **Charge events reconciled to the declared Console event.** All three tools now fire the single PPE event `tool-call`. The previous build fired `tool-call-standard` (get_company_metrics) and `tool-call-premium` (compare_companies), which were never declared in the Apify Console Monetization settings — so the platform logged them as "unknown events" and the charges silently failed to attach. PPE event definitions live in the Console, not in `.actor/actor.json`; the code now names only the event the Console actually declares.

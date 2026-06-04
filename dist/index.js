@@ -215,7 +215,7 @@ const CompareCompaniesOutputShape = {
 export function createServer() {
     const server = new McpServer({
         name: 'toolstem-mcp-server',
-        version: '1.2.15',
+        version: '1.2.16',
     });
     server.registerTool('get_stock_snapshot', {
         title: 'Stock Snapshot',
@@ -427,7 +427,7 @@ async function runHttp() {
     // /health is intentionally unauthenticated: load balancers and uptime probes
     // need to reach it without credentials. It exposes no secrets or user data.
     app.get('/health', (_req, res) => {
-        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.15' });
+        res.json({ status: 'ok', service: 'toolstem-mcp-server', version: '1.2.16' });
     });
     app.post('/mcp', mcpLimiter, bearerAuth, async (req, res) => {
         try {
@@ -491,7 +491,7 @@ async function runHttp() {
     const isRemoteBind = bindHost === '0.0.0.0';
     app.listen(port, bindHost, () => {
         // eslint-disable-next-line no-console
-        console.log(`\n  Toolstem MCP server v1.2.15\n` +
+        console.log(`\n  Toolstem MCP server v1.2.16\n` +
             `  Listening on http://${bindHost}:${port}/mcp\n` +
             `  Auth:    ${authEnabled ? 'ENABLED (bearer token)' : 'DISABLED'}\n` +
             `  Remote:  ${isRemoteBind ? 'ALLOWED (0.0.0.0)' : 'localhost only (127.0.0.1)'}` +
