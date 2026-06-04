@@ -14,22 +14,25 @@ Unlike passthrough wrappers that just expose a vendor's REST API, every Toolstem
 
 One call. One agent-friendly JSON response. No nested arrays to parse, no cross-endpoint stitching, no null-checking boilerplate.
 
-The hosted endpoint lives at **`https://mcp.toolstem.com/mcp/finance`**. Product page: <https://toolstem.com/finance/>.
-
 ---
 
-## Free vs paid
+## Quickstart — hosted endpoint (recommended)
 
-- **MCP `initialize` and `tools/list` are free** — discovery, schema introspection, and health checks never cost anything.
-- **`tools/call` costs 0.01 USDC on Base mainnet (~$0.01) per invocation, paid via [x402](https://www.x402.org).** No API key, no signup, no marketplace account required — the agent's wallet pays directly.
+Point your MCP client or agent at the hosted endpoint. **No API key, no infra, no setup.** Billing is per-call via [x402](https://www.x402.org) — the agent's wallet pays directly in USDC on Base mainnet.
 
-Self-hosted (stdio or your own HTTP) skips the x402 paywall entirely; you bring your own `FMP_API_KEY` and pay FMP directly.
+```
+https://mcp.toolstem.com/mcp/finance
+```
 
----
+- **No FMP API key required** — you do not bring or manage any upstream data key.
+- **No infrastructure** — nothing to install, host, or keep running.
+- **No setup** — connect an MCP client and call a tool.
+- `initialize` and `tools/list` are **free** (discovery and schema introspection).
+- Each `tools/call` costs **$0.01 USDC** on Base mainnet, settled via x402.
 
-## Try it in Claude Desktop
+### Claude Desktop
 
-Drop this into your `claude_desktop_config.json` to use the hosted, pay-per-call endpoint (no API key needed — your agent's wallet pays $0.01 USDC per `tools/call` via x402):
+Drop this into your `claude_desktop_config.json`:
 
 ```json
 {
@@ -43,7 +46,39 @@ Drop this into your `claude_desktop_config.json` to use the hosted, pay-per-call
 
 Restart Claude Desktop, then ask: *"Use Toolstem to get a snapshot of NVDA."*
 
-Prefer running locally with your own FMP key? See [Self-hosting](#self-hosting) below.
+### Any MCP client (LangChain.js)
+
+The official [`@langchain/mcp-adapters`](https://www.npmjs.com/package/@langchain/mcp-adapters) library connects directly to the hosted URL:
+
+```ts
+import { MultiServerMCPClient } from "@langchain/mcp-adapters";
+import { ChatOpenAI } from "@langchain/openai";
+import { createReactAgent } from "@langchain/langgraph/prebuilt";
+
+const client = new MultiServerMCPClient({
+  toolstem_finance: {
+    transport: "http",
+    url: "https://mcp.toolstem.com/mcp/finance",
+    // Add your x402-signing middleware via headers, OR run an x402
+    // proxy locally and point url at it. See https://www.x402.org/clients.
+  },
+});
+
+const tools = await client.getTools();
+const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-4o-mini" }), tools });
+await agent.invoke({ messages: "Compare AAPL, MSFT, and GOOGL on valuation and growth." });
+```
+
+Prefer to run the server yourself with your own FMP key? See [Advanced: self-host](#advanced-self-host) at the bottom.
+
+Product page: <https://toolstem.com/finance/>.
+
+---
+
+## Pricing
+
+- **MCP `initialize` and `tools/list` are free** — discovery, schema introspection, and health checks never cost anything.
+- **`tools/call` costs $0.01 USDC on Base mainnet per invocation, paid via [x402](https://www.x402.org).** No API key, no signup, no marketplace account required — the agent's wallet pays directly.
 
 ---
 
@@ -306,45 +341,11 @@ Most financial MCP servers expose one tool per API endpoint — forcing your age
 
 ---
 
-## Hosted endpoint (recommended)
+## Advanced: self-host
 
-```
-https://mcp.toolstem.com/mcp/finance
-```
+> **Most users should use the [hosted endpoint](#quickstart--hosted-endpoint-recommended) above** — it needs no API key, no infrastructure, and no setup. This section is for users who specifically want to run the server themselves.
 
-- Streamable HTTP MCP transport.
-- Free for `initialize` and `tools/list`.
-- 0.01 USDC on Base mainnet per `tools/call`, settled via [x402](https://www.x402.org).
-- No API key required — your agent's wallet pays directly.
-
-### Use with LangChain.js
-
-The official [`@langchain/mcp-adapters`](https://www.npmjs.com/package/@langchain/mcp-adapters) library connects directly:
-
-```ts
-import { MultiServerMCPClient } from "@langchain/mcp-adapters";
-import { ChatOpenAI } from "@langchain/openai";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-
-const client = new MultiServerMCPClient({
-  toolstem_finance: {
-    transport: "http",
-    url: "https://mcp.toolstem.com/mcp/finance",
-    // Add your x402-signing middleware via headers, OR run an x402
-    // proxy locally and point url at it. See https://www.x402.org/clients.
-  },
-});
-
-const tools = await client.getTools();
-const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-4o-mini" }), tools });
-await agent.invoke({ messages: "Compare AAPL, MSFT, and GOOGL on valuation and growth." });
-```
-
----
-
-## Self-hosting
-
-Run the Node MCP server locally with your own FMP key — no x402, no per-call charge beyond your FMP quota.
+Run the Node MCP server locally with your own FMP key — no x402, no per-call charge beyond your FMP quota. You are responsible for obtaining and managing your own `FMP_API_KEY` and for any infrastructure you run.
 
 ### npm
 
