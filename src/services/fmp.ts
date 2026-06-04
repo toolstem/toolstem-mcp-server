@@ -574,9 +574,10 @@ export class FmpClient {
    *
    * FMP's `/company-screener` requires a paid plan (HTTP 402 on free tier).
    * We instead operate over a fixed Russell 1000 universe (src/data/universe.ts):
-   * batch-fetch live quotes for the full universe via `/batch-quote`
-   * (free-tier), merge sector data from the universe file, and filter
-   * in-memory.
+   * fetch live quotes for the full universe via `getBatchQuote` (which fans
+   * out to the per-symbol `/quote` endpoint on the current plan, since
+   * `/batch-quote` is now paywalled), merge sector data from the universe
+   * file, and filter in-memory.
    *
    * Supported filters: sector, marketCap (min/max), price (min/max), volume
    * (min), isEtf, isFund, isActivelyTrading, limit.
@@ -623,8 +624,9 @@ export class FmpClient {
       if (candidates.length === 0) return [];
     }
 
-    // Batch the universe into /batch-quote calls. FMP accepts many symbols
-    // per call; we chunk at 100 to stay safely under URL length limits.
+    // Chunk the universe before handing each chunk to getBatchQuote (which
+    // fans out to per-symbol /quote calls internally). We chunk at 100 to
+    // bound the in-flight fan-out per chunk.
     const BATCH_SIZE = 100;
     const symbols = candidates.map((e) => e.symbol);
     const chunks: string[][] = [];
@@ -694,14 +696,32 @@ export class FmpClient {
   }
 
   /**
-   * Batch quote — get quotes for multiple symbols in a single call.
-   * Symbols are comma-separated.
+   * Batch quote — get quotes for multiple symbols.
+   *
+   * FMP moved `/batch-quote` behind a paid plan tier; on the Starter/free
+   * plan it returns HTTP 402, so we no longer call it. Instead we fan out to
+   * the per-symbol `/quote` endpoint (available on the current plan) with
+   * bounded concurrency and merge the results. The returned shape is
+   * identical to the old batch endpoint, so callers are unchanged.
    */
   async getBatchQuote(symbols: string[]): Promise<FmpQuote[]> {
-    const data = await this.request<FmpQuote[]>('/batch-quote', {
-      symbols: symbols.join(','),
-    });
-    if (!data || !Array.isArray(data)) return [];
-    return data;
+    if (!symbols || symbols.length === 0) return [];
+
+    const concurrency = 5;
+    const results: FmpQuote[] = [];
+    let cursor = 0;
+
+    const worker = async (): Promise<void> => {
+      while (cursor < symbols.length) {
+        const sym = symbols[cursor++];
+        const quote = await this.getQuote(sym);
+        if (quote) results.push(quote);
+      }
+    };
+
+    const workerCount = Math.min(concurrency, symbols.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+    return results;
   }
 }

@@ -324,10 +324,11 @@ export async function compareCompanies(
   const fmp = client ?? new FmpClient();
   const normalized = symbols.map((s) => s.trim().toUpperCase());
 
-  // 1. Batch quote with per-symbol fallback on 402/empty.
-  // FMP moved /stable/batch-quote behind a paywall on free tier; withBatchFallback
-  // degrades gracefully to per-symbol getQuote calls so the comparison still
-  // returns a complete response instead of failing the whole tool.
+  // 1. Quote fetch with per-symbol fallback on empty result.
+  // FMP moved /stable/batch-quote behind a paid plan tier, so getBatchQuote now
+  // fans out to per-symbol /quote internally. withBatchFallback remains as a
+  // second safety net so the comparison still returns a complete response
+  // instead of failing the whole tool.
   const { results: quotes, diag: quoteDiag } = await withBatchFallback<string, FmpQuote>(
     normalized,
     async (syms) => {

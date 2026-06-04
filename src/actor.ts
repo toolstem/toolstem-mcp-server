@@ -1,18 +1,20 @@
 /**
  * Toolstem Finance MCP — Apify Actor entry point.
  *
- * Three-tier per-result pricing model (v1.2.9+):
+ * Pay-Per-Event billing model:
  *
- *   Tool                 | PPE Event Name       | Tier     | Price
- *   ---------------------|----------------------|----------|-------
- *   get_stock_snapshot   | tool-call            | Cheap    | $0.005
- *   get_company_metrics  | tool-call-standard   | Standard | $0.05
- *   compare_companies    | tool-call-premium    | Premium  | $0.50
+ *   All three tools fire the single PPE event `tool-call`.
  *
- * Dollar amounts for `tool-call-standard` and `tool-call-premium` are
- * configured in the Apify Console PPE settings — this code only fires
- * `Actor.charge({ eventName })`. The Apify platform then deducts the
- * configured amount from the caller's prepaid credit balance.
+ * The event name MUST exactly match an event declared in the Apify Console
+ * Monetization settings — PPE event definitions live in the Console, not in
+ * `.actor/actor.json`. Firing an undeclared event name causes Apify to log it
+ * as an "unknown event" and the charge silently fails to attach. The Console
+ * declares exactly one event (`tool-call`), so this code fires only that name.
+ *
+ * Charges are emitted ONLY after a successful upstream response (the tool
+ * produced real data). On upstream failure — every FMP request returned an
+ * error or empty payload — the run fails and no charge is fired. Callers are
+ * never billed for a run that produced no usable data.
  *
  * Default-demo runs (no input.tool provided) skip all PPE charges — they
  * exist solely for directory health-check probes and first-time evaluators
@@ -29,6 +31,44 @@ interface ActorInput {
   symbol?: string;
   period?: 'annual' | 'quarter';
   symbols?: string[];
+}
+
+/**
+ * Decide whether a tool result reflects a successful upstream response.
+ *
+ * Each tool degrades gracefully on upstream failure by returning a
+ * well-formed object whose data fields are null/empty. That is the right
+ * behavior for the MCP client, but it must NOT trigger a charge — billing a
+ * caller for an all-null payload is the exact failure this guard prevents.
+ *
+ * Returns true only when the tool's primary upstream data is present.
+ */
+function wasUpstreamSuccessful(tool: ActorInput['tool'], result: unknown): boolean {
+  if (result === null || typeof result !== 'object') return false;
+  const r = result as Record<string, any>;
+
+  switch (tool) {
+    case 'get_stock_snapshot':
+      // Primary signal is the live quote price.
+      return r.price?.current !== null && r.price?.current !== undefined;
+
+    case 'get_company_metrics':
+      // periods_analyzed > 0 means at least one financial statement returned.
+      return typeof r.meta?.periods_analyzed === 'number' && r.meta.periods_analyzed > 0;
+
+    case 'compare_companies':
+      // Success if at least one compared company has a live price.
+      return (
+        Array.isArray(r.companies) &&
+        r.companies.some(
+          (c: Record<string, any>) =>
+            c?.price?.current !== null && c?.price?.current !== undefined,
+        )
+      );
+
+    default:
+      return false;
+  }
 }
 
 async function main(): Promise<void> {
@@ -116,28 +156,41 @@ async function main(): Promise<void> {
         );
     }
 
+    // Guard: never charge (or even surface results) for a run whose upstream
+    // requests all failed. The tool returns an all-null object on total
+    // upstream failure; billing that is exactly the bug this prevents.
+    const upstreamOk = wasUpstreamSuccessful(input.tool, result);
+
+    if (!isDefaultDemo && !upstreamOk) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `Upstream data provider returned no usable data for ${input.tool}. ` +
+        `No charge fired — failing the run.`,
+      );
+      await Actor.fail('Upstream data provider returned no usable data. No charge was applied.');
+      return;
+    }
+
     await Actor.pushData(result as Record<string, unknown>);
 
     if (isDefaultDemo) {
       // Cache the demo result so subsequent probes are served from cache,
-      // not by calling FMP again.
-      await Actor.setValue(DEMO_CACHE_KEY, { at: Date.now(), result });
+      // not by calling FMP again — but only when it carries real data, so a
+      // transient upstream failure doesn't get pinned for 6h.
+      if (upstreamOk) {
+        await Actor.setValue(DEMO_CACHE_KEY, { at: Date.now(), result });
+      }
       // eslint-disable-next-line no-console
-      console.log('Default demonstration result cached for 6h. PPE charge skipped (probe).');
+      console.log('Default demonstration result served. PPE charge skipped (probe).');
     } else {
-      // Route to the correct PPE event based on the tool that was called.
-      // Dollar amounts are configured in Apify Console — this code only names
-      // the event; the platform resolves the charge.
-      // Type the value side as a union too — a typo like 'tool_call_standard'
-      // (underscore instead of hyphen) would otherwise compile and silently
-      // mis-charge. With this union, tsc fails loudly.
-      type PpeEventName = 'tool-call' | 'tool-call-standard' | 'tool-call-premium';
-      const PRICING_TIER: Record<ActorInput['tool'], PpeEventName> = {
-        get_stock_snapshot: 'tool-call',           // Cheap    — $0.005
-        get_company_metrics: 'tool-call-standard', // Standard — $0.05
-        compare_companies: 'tool-call-premium',    // Premium  — $0.50
-      };
-      const eventName = PRICING_TIER[input.tool];
+      // Single declared PPE event. Event names are configured in the Apify
+      // Console Monetization settings, not in actor.json; firing a name the
+      // Console does not declare logs an "unknown event" and the charge never
+      // attaches. The Console declares exactly one event: `tool-call`.
+      //
+      // The charge fires here, AFTER wasUpstreamSuccessful() confirmed real
+      // data was produced — never on an upstream failure.
+      const eventName: 'tool-call' = 'tool-call';
       const chargeResult = await Actor.charge({ eventName });
       // eslint-disable-next-line no-console
       console.log(`PPE charge result (${eventName}):`, JSON.stringify(chargeResult));

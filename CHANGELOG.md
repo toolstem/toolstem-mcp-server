@@ -5,6 +5,13 @@ All notable changes to the Toolstem MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.15] - 2026-06-04
+### Security / Billing
+- **Charge events reconciled to the declared Console event.** All three tools now fire the single PPE event `tool-call`. The previous build fired `tool-call-standard` (get_company_metrics) and `tool-call-premium` (compare_companies), which were never declared in the Apify Console Monetization settings — so the platform logged them as "unknown events" and the charges silently failed to attach. PPE event definitions live in the Console, not in `.actor/actor.json`; the code now names only the event the Console actually declares.
+- **Never charge on upstream failure.** Charges are emitted only after `wasUpstreamSuccessful()` confirms the tool produced real data. If every upstream data-provider request fails or returns empty, the run fails with a generic message and no PPE event is fired — callers are never billed for an all-null payload.
+- **Replaced the paywalled batch-quote endpoint.** The upstream provider moved `/batch-quote` behind a higher plan tier (HTTP 402 on the current plan). `getBatchQuote` now fans out to the per-symbol `/quote` endpoint (available on the current plan) with bounded concurrency and merges the results — identical response shape, no caller changes. Fixes `compare_companies` and the internal screener path.
+- Version promoted to 1.2.15 across `package.json`, `server.json` (top-level + `packages[0]`), both versioned locations in `src/index.ts`, and `.well-known/mcp/server-card.json`.
+
 ## [1.2.14] - 2026-05-08
 ### Security
 - Harden FmpClient diagnostic fields — `_lastHttpBody`, `_lastHttpStatus`, `_lastScreenDiag` are now private
