@@ -1,0 +1,61 @@
+name: Publish to npm (manual)
+
+# Manual-dispatch publish path using the NPM_TOKEN repo secret.
+#
+# This complements release.yml (tag-triggered, OIDC Trusted Publisher).
+# Use this when you want to publish the version currently on the default
+# branch without cutting a git tag. Publishes whatever version is in
+# package.json on the ref this workflow runs against.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies (clean)
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Verify published version
+        run: |
+          set -euo pipefail
+          EXPECTED=$(node -p "require('./package.json').version")
+          for i in 1 2 3 4 5; do
+            PUBLISHED=$(npm view "toolstem-mcp-server@${EXPECTED}" version 2>/dev/null || echo "")
+            echo "Attempt $i: registry shows '$PUBLISHED' for version $EXPECTED"
+            if [ "$PUBLISHED" = "$EXPECTED" ]; then
+              echo "::notice::Published toolstem-mcp-server@$EXPECTED"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Published version did not converge to $EXPECTED within 50s"
+          exit 1
