@@ -413,9 +413,10 @@ export declare class FmpClient {
      *
      * FMP's `/company-screener` requires a paid plan (HTTP 402 on free tier).
      * We instead operate over a fixed Russell 1000 universe (src/data/universe.ts):
-     * batch-fetch live quotes for the full universe via `/batch-quote`
-     * (free-tier), merge sector data from the universe file, and filter
-     * in-memory.
+     * fetch live quotes for the full universe via `getBatchQuote` (which fans
+     * out to the per-symbol `/quote` endpoint on the current plan, since
+     * `/batch-quote` is now paywalled), merge sector data from the universe
+     * file, and filter in-memory.
      *
      * Supported filters: sector, marketCap (min/max), price (min/max), volume
      * (min), isEtf, isFund, isActivelyTrading, limit.
@@ -450,8 +451,13 @@ export declare class FmpClient {
         limit?: number;
     }): Promise<FmpScreenerResult[]>;
     /**
-     * Batch quote — get quotes for multiple symbols in a single call.
-     * Symbols are comma-separated.
+     * Batch quote — get quotes for multiple symbols.
+     *
+     * FMP moved `/batch-quote` behind a paid plan tier; on the Starter/free
+     * plan it returns HTTP 402, so we no longer call it. Instead we fan out to
+     * the per-symbol `/quote` endpoint (available on the current plan) with
+     * bounded concurrency and merge the results. The returned shape is
+     * identical to the old batch endpoint, so callers are unchanged.
      */
     getBatchQuote(symbols: string[]): Promise<FmpQuote[]>;
 }
