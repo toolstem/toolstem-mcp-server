@@ -1,5 +1,9 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "name": "Toolstem Finance MCP",
+  "description": "Live stock data, company metrics, and market comparisons billed per-call in USDC via x402. No API keys — the agent's wallet pays automatically.",
+  "icon": "https://www.toolstem.com/favicon.ico",
+  "tags": ["finance", "stocks", "x402", "payments", "market-data", "langchain"],
   "maintainers": [
     "toolstem"
   ]
