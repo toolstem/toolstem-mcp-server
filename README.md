@@ -1,6 +1,7 @@
 # 📊 Toolstem — Financial Data MCP for AI Agents | Stock Analysis & DCF
 
 [![npm version](https://img.shields.io/npm/v/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
+[![npm downloads](https://img.shields.io/npm/dw/toolstem-mcp-server)](https://www.npmjs.com/package/toolstem-mcp-server)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-active-teal)](https://registry.modelcontextprotocol.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
@@ -69,7 +70,19 @@ const agent = createReactAgent({ llm: new ChatOpenAI({ model: "gpt-4o-mini" }), 
 await agent.invoke({ messages: "Compare AAPL, MSFT, and GOOGL on valuation and growth." });
 ```
 
+### LangChain quick-start (`langchain-toolstem`)
+
+The [`langchain-toolstem`](https://www.npmjs.com/package/langchain-toolstem) wrapper handles x402 payment for you — pass a funded wallet key and the tools auto-pay per call:
+
+```typescript
+import { createToolstemTools } from 'langchain-toolstem';
+const tools = await createToolstemTools({ walletPrivateKey: process.env.WALLET_KEY });
+// Tools auto-pay $0.01 USDC per call via x402
+```
+
 Prefer to run the server yourself with your own FMP key? See [Advanced: self-host](#advanced-self-host) at the bottom.
+
+Try the tools live in the [Toolstem playground](https://www.toolstem.com/playground/).
 
 Product page: <https://toolstem.com/finance/>.
 
@@ -79,6 +92,16 @@ Product page: <https://toolstem.com/finance/>.
 
 - **MCP `initialize` and `tools/list` are free** — discovery, schema introspection, and health checks never cost anything.
 - **`tools/call` costs $0.01 USDC on Base mainnet per invocation, paid via [x402](https://www.x402.org).** No API key, no signup, no marketplace account required — the agent's wallet pays directly.
+
+| Tool | Per call |
+|------|----------|
+| `get_stock_snapshot` | $0.01 USDC |
+| `get_company_metrics` | $0.01 USDC |
+| `compare_companies` | $0.01 USDC |
+
+### How billing works
+
+Toolstem uses the x402 payment protocol. Agents pay per call in USDC on Base — no API keys, no subscriptions, no invoices. The agent's wallet settles each call automatically via EIP-3009.
 
 ---
 
